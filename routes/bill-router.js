@@ -165,15 +165,20 @@ doc.x = 40;
     doc.text(`เพื่อชำระ: ค่าทุเรียน`);
 
     const date = new Date(bill.date);
-    const dateStr = date.toLocaleDateString("th-TH", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-    const timeStr = date.toLocaleTimeString("th-TH", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+
+const dateStr = new Intl.DateTimeFormat('th-TH', {
+  year: 'numeric',
+  month: 'long',
+  day: 'numeric',
+  timeZone: 'Asia/Bangkok'
+}).format(date);
+
+const timeStr = new Intl.DateTimeFormat('th-TH', {
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+  timeZone: 'Asia/Bangkok'
+}).format(date);
     doc.text(`วันที่: ${dateStr} เวลา: ${timeStr}`);
     doc.moveDown();
 
