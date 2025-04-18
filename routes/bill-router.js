@@ -161,7 +161,7 @@ doc.x = 40;
     doc.moveDown();
     doc.fontSize(14).text(`รหัสบิล: ${bill.id}`);
     doc.text(`จ่ายให้: ${bill.seller}`);
-    doc.text("โดย: ___ เงินสด   ___ โอนผ่านบัญชีธนาคาร");
+
     doc.text(`เพื่อชำระ: ค่าทุเรียน`);
 
     const date = new Date(bill.date);
@@ -199,7 +199,7 @@ doc.x = 40;
     doc.fontSize(14).text(`รวมเงิน: ${total.toLocaleString()} บาท`, {
       align: "right",
     });
-
+    doc.text("โดย: ___ เงินสด   ___ โอนผ่านบัญชีธนาคาร");
     // ✅ ช่องเซ็นชื่อและวันที่
     doc.moveDown().moveDown();
     const signatureY = doc.y;
