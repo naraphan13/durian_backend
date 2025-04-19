@@ -116,7 +116,7 @@ router.get("/:id/pdf", async (req, res) => {
     if (!bill) return res.status(404).send("Bill not found");
 
     const doc = new PDFDocument({
-      size: [648, 396], // 9 x 5.5 inches in points
+      size: [648, 396], // ขนาดประมาณ A5 แนวนอน
       margin: 20,
     });
 
@@ -128,49 +128,14 @@ router.get("/:id/pdf", async (req, res) => {
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `inline; filename="bill-${bill.id}.pdf"`);
-
     doc.pipe(res);
 
-    // โลโก้ซ้าย + ข้อมูลบริษัทขวา
-    const logoPath = path.join(__dirname, "../picture/S__35299513pn.png");
-    const logoSize = 60;
-    const padding = 20;
-    const textBlockWidth = 250;
-    const totalWidth = logoSize + padding + textBlockWidth;
-    const centerX = (doc.page.width - totalWidth) / 2;
-
-    const logoX = centerX;
-    const logoY = 20;
-    const infoX = logoX + logoSize + padding;
-    const infoY = logoY;
-
-    if (fs.existsSync(logoPath)) {
-      doc.image(logoPath, logoX, logoY, { fit: [logoSize, logoSize] });
-    }
-
-    doc
-      .fontSize(14)
-      .text("บริษัท สุริยา 388 จำกัด", infoX, infoY, { align: "left" })
-      .fontSize(9)
-      .text("เลขที่ 203/2 หมู่ 12 ต.บ้านนา อ.เมืองชุมพร จ.ชุมพร 86190", infoX, infoY + 20, { align: "left" })
-      .text("โทร: 081-078-2324 , 082-801-1225", infoX, infoY + 35, { align: "left" });
-
-    // ข้อมูลหัวบิลชิดซ้ายสุด
-    const headerX = 20;
-    let headerY = logoY + logoSize + 20;
-
-    doc.fontSize(13).text("ใบสำคัญจ่าย", headerX, headerY, {
-      align: "left",
-      underline: true,
-    });
-
-    headerY += 25;
-    doc.fontSize(11).text(`รหัสบิล: ${bill.id}`, headerX, headerY);
-    headerY += 18;
-    doc.text(`จ่ายให้: ${bill.seller}`, headerX, headerY);
-    headerY += 18;
-    doc.text(`โดย: ___ เงินสด   ___ โอนผ่านบัญชีธนาคาร`, headerX, headerY);
-    headerY += 18;
+    // ตำแหน่งพื้นฐาน
+    const logoSize = 40;
+    const topY = 20;
+    const leftX = 20;
+    const logoX = 300;
+    const companyX = logoX + logoSize + 10;
 
     const date = new Date(bill.date);
     const dateStr = new Intl.DateTimeFormat("th-TH", {
@@ -187,13 +152,41 @@ router.get("/:id/pdf", async (req, res) => {
       timeZone: "Asia/Bangkok",
     }).format(date);
 
-    doc.text(`เพื่อชำระ: ค่าทุเรียน`, headerX, headerY);
-    headerY += 18;
-    doc.text(`วันที่: ${dateStr} เวลา: ${timeStr}`, headerX, headerY);
+    // 🟩 บรรทัดที่ 1
+    doc.fontSize(11).text(
+      `รหัสบิล: ${bill.id}    จ่ายให้: ${bill.seller}    โดย: ___ เงินสด   ___ โอนผ่านบัญชีธนาคาร`,
+      leftX,
+      topY
+    );
 
-    // รายการที่ซื้อ
-    doc.moveDown(1);
-    doc.fontSize(13).text("รายการที่ซื้อ:", headerX);
+    if (fs.existsSync(path.join(__dirname, "../picture/S__35299513pn.png"))) {
+      doc.image(path.join(__dirname, "../picture/S__35299513pn.png"), logoX, topY - 2, {
+        fit: [logoSize, logoSize],
+      });
+    }
+
+    doc.fontSize(12).text("บริษัท สุริยา 388 จำกัด", companyX, topY);
+
+    // 🟩 บรรทัดที่ 2
+    doc.fontSize(11).text(`เพื่อชำระ: ค่าทุเรียน`, leftX, topY + 18);
+
+    // 🟩 บรรทัดที่ 3
+    doc
+      .fontSize(11)
+      .text(`วันที่: ${dateStr} เวลา: ${timeStr}`, leftX, topY + 36);
+
+    doc
+      .fontSize(9)
+      .text(
+        "เลขที่ 203/2 หมู่ 12 ต.บ้านนา อ.เมืองชุมพร จ.ชุมพร 86190 โทร: 081-078-2324 , 082-801-1225",
+        companyX,
+        topY + 36,
+        { align: "left", width: 260 }
+      );
+
+    // ➕ ต่อด้วยเนื้อหาอื่น เช่น รายการที่ซื้อ, รวมเงิน, ลายเซ็น...
+    doc.moveDown(2);
+    doc.fontSize(13).text("รายการที่ซื้อ:", leftX);
 
     const summaryByVarietyGrade = {};
     bill.items.forEach((item, i) => {
@@ -202,7 +195,7 @@ router.get("/:id/pdf", async (req, res) => {
       const subtotal = item.weight * item.pricePerKg;
 
       const line = `${i + 1}. ${item.variety} เกรด ${item.grade} | น้ำหนักต่อเข่ง: ${perBasket} กก. | น้ำหนักรวม: ${totalWeight} กก. x ${item.pricePerKg} บาท = ${subtotal.toLocaleString()} บาท`;
-      doc.fontSize(11).text(line, headerX);
+      doc.fontSize(11).text(line, leftX);
 
       const key = `${item.variety} ${item.grade}`;
       if (!summaryByVarietyGrade[key]) summaryByVarietyGrade[key] = 0;
@@ -215,7 +208,7 @@ router.get("/:id/pdf", async (req, res) => {
       align: "right",
     });
 
-    // ลายเซ็น
+    // ➕ ลายเซ็น
     doc.moveDown(1);
     const signatureY = doc.y;
     doc.text("...............................................", 40, signatureY);
