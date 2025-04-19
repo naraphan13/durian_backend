@@ -190,10 +190,18 @@ router.get("/:id/pdf", async (req, res) => {
     doc.text(`วันที่: ${dateStr} เวลา: ${timeStr}`, billInfoX, topY + 36);
 
     doc.moveDown(0.5);
-    doc.font("thai-bold").fontSize(13).text("ใบสำคัญจ่าย PAYMENT VOUCHER", { align: "center", underline: true });
+    doc.font("thai-bold").fontSize(15).text(
+      "ใบสำคัญจ่าย PAYMENT VOUCHER",
+      0,
+      doc.y,
+      {
+        align: "center",
+        width: doc.page.width
+      }
+    );
 
     // ===================== รายการที่ซื้อ ===================== //
-    doc.moveDown(2);
+    doc.moveDown(1);
     doc.font("thai-bold").fontSize(15).text("รายการที่ซื้อ:", 20);
 
     const summaryByVarietyGrade = {};
