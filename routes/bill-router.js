@@ -116,7 +116,7 @@ router.get("/:id/pdf", async (req, res) => {
     if (!bill) return res.status(404).send("Bill not found");
 
     const doc = new PDFDocument({
-      size: [648, 396], // A5 landscape
+      size: [648, 396], // A5 แนวนอน
       margin: 20,
     });
 
@@ -136,7 +136,7 @@ router.get("/:id/pdf", async (req, res) => {
     const topY = 20;
     const leftX = 20;
     const logoX = 300;
-    const logoY = topY +10
+    const logoY = topY + 20; // โลโก้เลื่อนลงเล็กน้อย
     const companyX = logoX + logoSize + 10;
 
     const date = new Date(bill.date);
@@ -161,7 +161,7 @@ router.get("/:id/pdf", async (req, res) => {
     );
 
     if (fs.existsSync(logoPath)) {
-      doc.image(logoPath, logoX, logoY - 5, { fit: [logoSize, logoSize] });
+      doc.image(logoPath, logoX, logoY, { fit: [logoSize, logoSize] });
     }
 
     doc.fontSize(12).text("บริษัท สุริยา 388 จำกัด", companyX, topY);
@@ -210,16 +210,16 @@ router.get("/:id/pdf", async (req, res) => {
       align: "right",
     });
 
-    // ===================== ลายเซ็น ===================== //
-    doc.moveDown(1);
-    const signatureY = doc.y;
-    doc.text("...............................................", 40, signatureY);
-    doc.fontSize(9).text("ผู้จ่ายเงิน", 40, signatureY + 12);
-    doc.text("ลงวันที่: ........../........../..........", 40, signatureY + 24);
+    // ===================== ลายเซ็น (ชิดล่างสุด) ===================== //
+    const signatureBaseY = doc.page.height - 60;
 
-    doc.text("...............................................", 340, signatureY);
-    doc.fontSize(9).text("ผู้รับเงิน", 340, signatureY + 12);
-    doc.text("ลงวันที่: ........../........../..........", 340, signatureY + 24);
+    doc.fontSize(11).text("...............................................", 40, signatureBaseY);
+    doc.fontSize(9).text("ผู้จ่ายเงิน", 40, signatureBaseY + 12);
+    doc.text("ลงวันที่: ........../........../..........", 40, signatureBaseY + 24);
+
+    doc.text("...............................................", 340, signatureBaseY);
+    doc.fontSize(9).text("ผู้รับเงิน", 340, signatureBaseY + 12);
+    doc.text("ลงวันที่: ........../........../..........", 340, signatureBaseY + 24);
 
     doc.end();
   } catch (err) {
@@ -227,6 +227,8 @@ router.get("/:id/pdf", async (req, res) => {
     res.status(500).send("เกิดข้อผิดพลาด");
   }
 });
+
+
 
 
 
