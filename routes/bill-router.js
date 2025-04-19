@@ -105,6 +105,65 @@ router.get("/summary/data", async (req, res) => {
 
 
 
+router.delete("/:id", async (req, res) => {
+  try {
+    await prisma.item.deleteMany({ where: { billId: parseInt(req.params.id) } });
+    await prisma.bill.delete({ where: { id: parseInt(req.params.id) } });
+    res.json({ message: "ลบสำเร็จ" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "ลบไม่สำเร็จ" });
+  }
+});
+
+
+
+
+
+
+
+
+
+
+router.put("/:id", async (req, res) => {
+  const { seller, items } = req.body;
+  try {
+    const billId = parseInt(req.params.id);
+
+    await prisma.item.deleteMany({ where: { billId } }); // ลบรายการเก่าทั้งหมด
+
+    const bill = await prisma.bill.update({
+      where: { id: billId },
+      data: {
+        seller,
+        items: {
+          create: items.map((item) => ({
+            variety: item.variety,
+            grade: item.grade,
+            weight: parseFloat(item.weight),
+            weights: item.weights || [],
+            pricePerKg: parseFloat(item.pricePerKg),
+          })),
+        },
+      },
+      include: { items: true },
+    });
+
+    res.json(bill);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "แก้ไขบิลไม่สำเร็จ" });
+  }
+});
+
+
+
+
+
+
+
+
+
 
 router.get("/:id/pdf", async (req, res) => {
   try {
