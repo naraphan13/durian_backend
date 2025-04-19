@@ -201,7 +201,6 @@ router.get("/:id/pdf", async (req, res) => {
     );
 
     // ===================== รายการที่ซื้อ ===================== //
-    doc.moveDown(1);
     doc.font("thai-bold").fontSize(15).text("รายการที่ซื้อ:", 20);
 
     const summaryByVarietyGrade = {};
