@@ -117,7 +117,7 @@ router.get("/:id/pdf", async (req, res) => {
 
     const doc = new PDFDocument({
       size: [648, 396], // 9 x 5.5 inches in points
-      margin: 20
+      margin: 20,
     });
 
     const fontPath = path.join(__dirname, "../fonts/THSarabunNew.ttf");
@@ -131,25 +131,23 @@ router.get("/:id/pdf", async (req, res) => {
 
     doc.pipe(res);
 
+    // โลโก้ซ้าย + ข้อมูลบริษัทขวา
     const logoPath = path.join(__dirname, "../picture/S__35299513pn.png");
     const logoSize = 60;
     const padding = 20;
-    
-    // เตรียมความกว้างของ logo + ข้อความ (โดยประมาณ)
     const textBlockWidth = 250;
     const totalWidth = logoSize + padding + textBlockWidth;
-    
-    // คำนวณตำแหน่งเริ่มต้นให้อยู่กลางกระดาษ
     const centerX = (doc.page.width - totalWidth) / 2;
+
     const logoX = centerX;
     const logoY = 20;
     const infoX = logoX + logoSize + padding;
     const infoY = logoY;
-    
+
     if (fs.existsSync(logoPath)) {
       doc.image(logoPath, logoX, logoY, { fit: [logoSize, logoSize] });
     }
-    
+
     doc
       .fontSize(14)
       .text("บริษัท สุริยา 388 จำกัด", infoX, infoY, { align: "left" })
@@ -157,32 +155,45 @@ router.get("/:id/pdf", async (req, res) => {
       .text("เลขที่ 203/2 หมู่ 12 ต.บ้านนา อ.เมืองชุมพร จ.ชุมพร 86190", infoX, infoY + 20, { align: "left" })
       .text("โทร: 081-078-2324 , 082-801-1225", infoX, infoY + 35, { align: "left" });
 
-    doc.moveDown(0.5);
-    doc.fontSize(13).text("ใบสำคัญจ่าย", { align: "center", underline: true });
-    doc.moveDown(0.3);
-    doc.fontSize(11).text(`รหัสบิล: ${bill.id}    จ่ายให้: ${bill.seller}    โดย: ___ เงินสด   ___ โอนผ่านบัญชีธนาคาร`);
+    // ข้อมูลหัวบิลชิดซ้ายสุด
+    const headerX = 20;
+    let headerY = logoY + logoSize + 20;
+
+    doc.fontSize(13).text("ใบสำคัญจ่าย", headerX, headerY, {
+      align: "left",
+      underline: true,
+    });
+
+    headerY += 25;
+    doc.fontSize(11).text(`รหัสบิล: ${bill.id}`, headerX, headerY);
+    headerY += 18;
+    doc.text(`จ่ายให้: ${bill.seller}`, headerX, headerY);
+    headerY += 18;
+    doc.text(`โดย: ___ เงินสด   ___ โอนผ่านบัญชีธนาคาร`, headerX, headerY);
+    headerY += 18;
+
     const date = new Date(bill.date);
-
-    const dateStr = new Intl.DateTimeFormat('th-TH', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      timeZone: 'Asia/Bangkok'
+    const dateStr = new Intl.DateTimeFormat("th-TH", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      timeZone: "Asia/Bangkok",
     }).format(date);
 
-    const timeStr = new Intl.DateTimeFormat('th-TH', {
-      hour: '2-digit',
-      minute: '2-digit',
+    const timeStr = new Intl.DateTimeFormat("th-TH", {
+      hour: "2-digit",
+      minute: "2-digit",
       hour12: false,
-      timeZone: 'Asia/Bangkok'
+      timeZone: "Asia/Bangkok",
     }).format(date);
 
-    doc.text(`เพื่อชำระ: ค่าทุเรียน    วันที่: ${dateStr} เวลา: ${timeStr}`);
-  
+    doc.text(`เพื่อชำระ: ค่าทุเรียน`, headerX, headerY);
+    headerY += 18;
+    doc.text(`วันที่: ${dateStr} เวลา: ${timeStr}`, headerX, headerY);
 
-    
-    doc.moveDown(0.5);
-    doc.fontSize(10).text("รายการที่ซื้อ:");
+    // รายการที่ซื้อ
+    doc.moveDown(1);
+    doc.fontSize(13).text("รายการที่ซื้อ:", headerX);
 
     const summaryByVarietyGrade = {};
     bill.items.forEach((item, i) => {
@@ -191,7 +202,7 @@ router.get("/:id/pdf", async (req, res) => {
       const subtotal = item.weight * item.pricePerKg;
 
       const line = `${i + 1}. ${item.variety} เกรด ${item.grade} | น้ำหนักต่อเข่ง: ${perBasket} กก. | น้ำหนักรวม: ${totalWeight} กก. x ${item.pricePerKg} บาท = ${subtotal.toLocaleString()} บาท`;
-      doc.text(line);
+      doc.fontSize(11).text(line, headerX);
 
       const key = `${item.variety} ${item.grade}`;
       if (!summaryByVarietyGrade[key]) summaryByVarietyGrade[key] = 0;
@@ -204,6 +215,7 @@ router.get("/:id/pdf", async (req, res) => {
       align: "right",
     });
 
+    // ลายเซ็น
     doc.moveDown(1);
     const signatureY = doc.y;
     doc.text("...............................................", 40, signatureY);
@@ -220,6 +232,7 @@ router.get("/:id/pdf", async (req, res) => {
     res.status(500).send("เกิดข้อผิดพลาด");
   }
 });
+
 
 
 
