@@ -120,16 +120,18 @@ router.get("/:id/pdf", async (req, res) => {
       margin: 20,
     });
 
+    // ฟอนต์ธรรมดา
     const fontPath = path.join(__dirname, "../fonts/THSarabunNew.ttf");
     if (fs.existsSync(fontPath)) {
       doc.registerFont("thai", fontPath);
       doc.font("thai");
     }
 
+    // ฟอนต์ตัวหนา
     const fontPathBold = path.join(__dirname, "../fonts/THSarabunNewBold.ttf");
-if (fs.existsSync(fontPathBold)) {
-  doc.registerFont("thai-bold", fontPathBold);
-}
+    if (fs.existsSync(fontPathBold)) {
+      doc.registerFont("thai-bold", fontPathBold);
+    }
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `inline; filename="bill-${bill.id}.pdf"`);
@@ -137,12 +139,14 @@ if (fs.existsSync(fontPathBold)) {
 
     // ===================== HEADER ===================== //
     const logoPath = path.join(__dirname, "../picture/S__35299513pn.png");
-    const logoSize = 80;
+    const logoSize = 70;
     const topY = 20;
-    const leftX = 20;
-    const logoX = 300;
-    const logoY = topY + 10; // โลโก้เลื่อนลงเล็กน้อย
-    const companyX = logoX + logoSize + 10;
+
+    // ตำแหน่งต่าง ๆ
+    const logoX = 250;
+    const logoY = topY + 10;
+    const companyX = 20;
+    const billInfoX = logoX + logoSize + 20;
 
     const date = new Date(bill.date);
     const dateStr = new Intl.DateTimeFormat("th-TH", {
@@ -158,42 +162,36 @@ if (fs.existsSync(fontPathBold)) {
       timeZone: "Asia/Bangkok",
     }).format(date);
 
-    // 🟩 บรรทัดที่ 1
-    doc.fontSize(11).text(
-      `รหัสบิล: ${bill.id}    จ่ายให้: ${bill.seller}    โดย: ___ เงินสด   ___ โอนผ่านบัญชีธนาคาร`,
-      leftX,
-      topY
+    // 🟩 ฝั่งซ้าย: ข้อมูลบริษัท
+    doc.font("thai-bold").fontSize(12).text("บริษัท สุริยา388 จำกัด", companyX, topY);
+    doc.font("thai").fontSize(11).text(
+      "เลขที่ 203/2 ม.12 ต.บ้านนา อ.เมืองชุมพร จ.ชุมพร 86190",
+      companyX,
+      topY + 18
+    );
+    doc.text(
+      "โทร: 081-078-2324 , 082-801-1225 , 095-905-5588",
+      companyX,
+      topY + 36
     );
 
+    // 🟩 กลาง: โลโก้
     if (fs.existsSync(logoPath)) {
       doc.image(logoPath, logoX, logoY, { fit: [logoSize, logoSize] });
     }
 
-    doc.fontSize(12).text("บริษัท สุริยา388 จำกัด", companyX, topY);
-
-    // 🟩 บรรทัดที่ 2
-    doc.fontSize(11).text(`เพื่อชำระ: ค่าทุเรียน`, leftX, topY + 18);
-
-    doc.fontSize(11).text(
-      "เลขที่ 203/2 ม.12 ต.บ้านนา อ.เมืองชุมพร จ.ชุมพร 86190",
-      companyX,
-      topY + 18,
-      { align: "left", width: 260 }
+    // 🟩 ฝั่งขวา: ข้อมูลบิล
+    doc.font("thai").fontSize(11).text(
+      `รหัสบิล: ${bill.id}    จ่ายให้: ${bill.seller}    โดย: ___ เงินสด   ___ โอนผ่านบัญชีธนาคาร`,
+      billInfoX,
+      topY
     );
-
-    // 🟩 บรรทัดที่ 3
-    doc.fontSize(11).text(`วันที่: ${dateStr} เวลา: ${timeStr}`, leftX, topY + 36);
-
-    doc.fontSize(11).text(
-      "โทร: 081-078-2324 , 082-801-1225 , 095-905-5588",
-      companyX,
-      topY + 36,
-      { align: "left", width: 260 }
-    );
+    doc.text(`เพื่อชำระ: ค่าทุเรียน`, billInfoX, topY + 18);
+    doc.text(`วันที่: ${dateStr} เวลา: ${timeStr}`, billInfoX, topY + 36);
 
     // ===================== รายการที่ซื้อ ===================== //
     doc.moveDown(2);
-    doc.font("thai-bold").fontSize(15).text("รายการที่ซื้อ:", leftX);
+    doc.font("thai-bold").fontSize(15).text("รายการที่ซื้อ:", 20);
 
     const summaryByVarietyGrade = {};
     bill.items.forEach((item, i) => {
@@ -202,7 +200,7 @@ if (fs.existsSync(fontPathBold)) {
       const subtotal = item.weight * item.pricePerKg;
 
       const line = `${i + 1}. ${item.variety} เกรด ${item.grade} | น้ำหนักต่อเข่ง: ${perBasket} กก. | น้ำหนักรวม: ${totalWeight} กก. x ${item.pricePerKg} บาท = ${subtotal.toLocaleString()} บาท`;
-      doc.font("thai-bold").fontSize(15).text(line, leftX);
+      doc.font("thai").fontSize(13).text(line, 20);
 
       const key = `${item.variety} ${item.grade}`;
       if (!summaryByVarietyGrade[key]) summaryByVarietyGrade[key] = 0;
