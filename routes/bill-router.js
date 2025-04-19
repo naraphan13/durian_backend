@@ -195,7 +195,6 @@ router.get("/:id/pdf", async (req, res) => {
       doc.y,
       {
         align: "center",
-        underline: true,
         width: doc.page.width,
       }
     );
