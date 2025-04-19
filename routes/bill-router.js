@@ -132,9 +132,9 @@ router.get("/:id/pdf", async (req, res) => {
     doc.pipe(res);
 
     const logoPath = path.join(__dirname, "../picture/S__35299513pn.png");
-    const logoX = 20;
-    const logoY = 20;
     const logoSize = 50;
+    const logoX = (doc.page.width - logoSize) / 2;
+    const logoY = 20;
 
     if (fs.existsSync(logoPath)) {
       doc.image(logoPath, logoX, logoY, { fit: [logoSize, logoSize] });
@@ -143,19 +143,16 @@ router.get("/:id/pdf", async (req, res) => {
     const textX = logoX + logoSize + 15;
     const textY = logoY;
 
-    doc.fontSize(14).text("บริษัท ทุเรียนไทย จำกัด", textX, textY);
-    doc.fontSize(9).text("เลขที่ 123 หมู่ 5 ต.ทุเรียน อ.ผลไม้ จ.ผลไม้สด 12345", textX);
-    doc.text("โทร: 089-123-4567", textX);
+    doc.fontSize(14).text("บริษัท สุริยา 388 จำกัด", { align: "center" });
+    doc.fontSize(9).text("เลขที่ 203/2 หมู่ 12 ต.บ้านนา อ.เมืองชุมพร จ.ชุมพร 86190", { align: "center" });
+    doc.text("โทร: 081-078-2324 , 082-801-1225", { align: "center" });
 
     doc.moveDown(0.5);
     doc.fontSize(13).text("ใบสำคัญจ่าย", { align: "center", underline: true });
     doc.moveDown(0.3);
-    doc.fontSize(11).text(`รหัสบิล: ${bill.id}`);
-    doc.text(`จ่ายให้: ${bill.seller}`);
-    doc.text("โดย: ___ เงินสด   ___ โอนผ่านบัญชีธนาคาร");
-    doc.text(`เพื่อชำระ: ค่าทุเรียน`);
-
+    doc.fontSize(11).text(`รหัสบิล: ${bill.id}    จ่ายให้: ${bill.seller}    โดย: ___ เงินสด   ___ โอนผ่านบัญชีธนาคาร`);
     const date = new Date(bill.date);
+
     const dateStr = new Intl.DateTimeFormat('th-TH', {
       year: 'numeric',
       month: 'long',
@@ -170,8 +167,22 @@ router.get("/:id/pdf", async (req, res) => {
       timeZone: 'Asia/Bangkok'
     }).format(date);
 
-    doc.text(`วันที่: ${dateStr} เวลา: ${timeStr}`);
+    doc.text(`เพื่อชำระ: ค่าทุเรียน    วันที่: ${dateStr} เวลา: ${timeStr}`);
+    const dateStr = new Intl.DateTimeFormat('th-TH', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      timeZone: 'Asia/Bangkok'
+    }).format(date);
 
+    const timeStr = new Intl.DateTimeFormat('th-TH', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+      timeZone: 'Asia/Bangkok'
+    }).format(date);
+
+    
     doc.moveDown(0.5);
     doc.fontSize(10).text("รายการที่ซื้อ:");
 
@@ -198,11 +209,11 @@ router.get("/:id/pdf", async (req, res) => {
     doc.moveDown(1);
     const signatureY = doc.y;
     doc.text("...............................................", 40, signatureY);
-    doc.text("ผู้จ่ายเงิน", 40, signatureY + 12);
+    doc.fontSize(9).text("ผู้จ่ายเงิน", 40, signatureY + 12);
     doc.text("ลงวันที่: ........../........../..........", 40, signatureY + 24);
 
     doc.text("...............................................", 340, signatureY);
-    doc.text("ผู้รับเงิน", 340, signatureY + 12);
+    doc.fontSize(9).text("ผู้รับเงิน", 340, signatureY + 12);
     doc.text("ลงวันที่: ........../........../..........", 340, signatureY + 24);
 
     doc.end();
