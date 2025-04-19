@@ -115,7 +115,11 @@ router.get("/:id/pdf", async (req, res) => {
 
     if (!bill) return res.status(404).send("Bill not found");
 
-    const doc = new PDFDocument({ margin: 40 });
+    const doc = new PDFDocument({
+      size: [648, 396], // 9 x 5.5 inches in points
+      margin: 20
+    });
+
     const fontPath = path.join(__dirname, "../fonts/THSarabunNew.ttf");
     if (fs.existsSync(fontPath)) {
       doc.registerFont("thai", fontPath);
@@ -123,76 +127,62 @@ router.get("/:id/pdf", async (req, res) => {
     }
 
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader(
-      "Content-Disposition",
-      `inline; filename="bill-${bill.id}.pdf"`
-    );
+    res.setHeader("Content-Disposition", `inline; filename="bill-${bill.id}.pdf"`);
 
     doc.pipe(res);
 
     const logoPath = path.join(__dirname, "../picture/S__35299513pn.png");
+    const logoX = 20;
+    const logoY = 20;
+    const logoSize = 50;
 
-    const logoX = 60;
-    const logoY = 60;
-    const logoSize = 80;
-    
     if (fs.existsSync(logoPath)) {
       doc.image(logoPath, logoX, logoY, { fit: [logoSize, logoSize] });
     }
-    
-    // ✅ จัดตำแหน่งข้อความให้อยู่กลางกับโลโก้
-    const textX = logoX + logoSize + 20;
-    const textBlockHeight = 100; // ประมาณความสูงของข้อความ 3 บรรทัด
-    const textY = logoY + (logoSize / 2) - (textBlockHeight / 2); // กึ่งกลางพอดี
-    
-    doc
-      .fontSize(16)
-      .text("บริษัท ทุเรียนไทย จำกัด", textX, textY, { align: "left" })
-      .moveDown(0.2)
-      .fontSize(10)
-      .text("เลขที่ 123 หมู่ 5 ต.ทุเรียน อ.ผลไม้ จ.ผลไม้สด 12345", textX)
-      .text("โทร: 089-123-4567", textX);
 
-doc.moveDown(1); // ช่องว่างก่อนเนื้อหาถัดไป
+    const textX = logoX + logoSize + 15;
+    const textY = logoY;
 
-doc.x = 40;
+    doc.fontSize(14).text("บริษัท ทุเรียนไทย จำกัด", textX, textY);
+    doc.fontSize(9).text("เลขที่ 123 หมู่ 5 ต.ทุเรียน อ.ผลไม้ จ.ผลไม้สด 12345", textX);
+    doc.text("โทร: 089-123-4567", textX);
 
-    doc.fontSize(16).text("ใบสำคัญจ่าย", { align: "center", underline: true });
-    doc.moveDown();
-    doc.fontSize(14).text(`รหัสบิล: ${bill.id}`);
+    doc.moveDown(0.5);
+    doc.fontSize(13).text("ใบสำคัญจ่าย", { align: "center", underline: true });
+    doc.moveDown(0.3);
+    doc.fontSize(11).text(`รหัสบิล: ${bill.id}`);
     doc.text(`จ่ายให้: ${bill.seller}`);
-
+    doc.text("โดย: ___ เงินสด   ___ โอนผ่านบัญชีธนาคาร");
     doc.text(`เพื่อชำระ: ค่าทุเรียน`);
 
     const date = new Date(bill.date);
+    const dateStr = new Intl.DateTimeFormat('th-TH', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      timeZone: 'Asia/Bangkok'
+    }).format(date);
 
-const dateStr = new Intl.DateTimeFormat('th-TH', {
-  year: 'numeric',
-  month: 'long',
-  day: 'numeric',
-  timeZone: 'Asia/Bangkok'
-}).format(date);
+    const timeStr = new Intl.DateTimeFormat('th-TH', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+      timeZone: 'Asia/Bangkok'
+    }).format(date);
 
-const timeStr = new Intl.DateTimeFormat('th-TH', {
-  hour: '2-digit',
-  minute: '2-digit',
-  hour12: false,
-  timeZone: 'Asia/Bangkok'
-}).format(date);
     doc.text(`วันที่: ${dateStr} เวลา: ${timeStr}`);
-    doc.moveDown();
 
-    // ✅ รายการที่ซื้อแบบเดิม
-    doc.fontSize(12).text("รายการที่ซื้อ:");
+    doc.moveDown(0.5);
+    doc.fontSize(10).text("รายการที่ซื้อ:");
+
     const summaryByVarietyGrade = {};
     bill.items.forEach((item, i) => {
       const perBasket = item.weights?.join(" + ") || "-";
       const totalWeight = item.weight;
       const subtotal = item.weight * item.pricePerKg;
 
-      doc.text(`${i + 1}. ${item.variety} เกรด ${item.grade}`);
-      doc.text(`   น้ำหนักต่อเข่ง: ${perBasket} กก.`);
-      doc.text(`   น้ำหนักรวม: ${totalWeight} กก. x ${item.pricePerKg} บาท = ${subtotal.toLocaleString()} บาท`);
+      const line = `${i + 1}. ${item.variety} เกรด ${item.grade} | น้ำหนักต่อเข่ง: ${perBasket} กก. | น้ำหนักรวม: ${totalWeight} กก. x ${item.pricePerKg} บาท = ${subtotal.toLocaleString()} บาท`;
+      doc.text(line);
 
       const key = `${item.variety} ${item.grade}`;
       if (!summaryByVarietyGrade[key]) summaryByVarietyGrade[key] = 0;
@@ -200,21 +190,20 @@ const timeStr = new Intl.DateTimeFormat('th-TH', {
     });
 
     const total = Object.values(summaryByVarietyGrade).reduce((sum, val) => sum + val, 0);
-    doc.moveDown();
-    doc.fontSize(14).text(`รวมเงิน: ${total.toLocaleString()} บาท`, {
+    doc.moveDown(0.5);
+    doc.fontSize(12).text(`รวมเงิน: ${total.toLocaleString()} บาท`, {
       align: "right",
     });
-    doc.text("โดย: ___ เงินสด   ___ โอนผ่านบัญชีธนาคาร");
-    // ✅ ช่องเซ็นชื่อและวันที่
-    doc.moveDown().moveDown();
+
+    doc.moveDown(1);
     const signatureY = doc.y;
     doc.text("...............................................", 40, signatureY);
-    doc.text("ผู้จ่ายเงิน", 40, signatureY + 15);
-    doc.text("ลงวันที่: ........../........../..........", 40, signatureY + 30);
+    doc.text("ผู้จ่ายเงิน", 40, signatureY + 12);
+    doc.text("ลงวันที่: ........../........../..........", 40, signatureY + 24);
 
     doc.text("...............................................", 340, signatureY);
-    doc.text("ผู้รับเงิน", 340, signatureY + 15);
-    doc.text("ลงวันที่: ........../........../..........", 340, signatureY + 30);
+    doc.text("ผู้รับเงิน", 340, signatureY + 12);
+    doc.text("ลงวันที่: ........../........../..........", 340, signatureY + 24);
 
     doc.end();
   } catch (err) {
