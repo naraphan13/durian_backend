@@ -116,7 +116,7 @@ router.get("/:id/pdf", async (req, res) => {
     if (!bill) return res.status(404).send("Bill not found");
 
     const doc = new PDFDocument({
-      size: [648, 396], // ขนาดประมาณ A5 แนวนอน
+      size: [648, 396], // A5 แนวนอน
       margin: 20,
     });
 
@@ -128,14 +128,15 @@ router.get("/:id/pdf", async (req, res) => {
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `inline; filename="bill-${bill.id}.pdf"`);
+
     doc.pipe(res);
 
-    // ตำแหน่งพื้นฐาน
-    const logoSize = 40;
-    const topY = 20;
+    // 🔧 ตำแหน่งพื้นฐาน
     const leftX = 20;
+    const logoSize = 60;
     const logoX = 300;
     const companyX = logoX + logoSize + 10;
+    const topY = 20;
 
     const date = new Date(bill.date);
     const dateStr = new Intl.DateTimeFormat("th-TH", {
@@ -152,7 +153,7 @@ router.get("/:id/pdf", async (req, res) => {
       timeZone: "Asia/Bangkok",
     }).format(date);
 
-    // 🟩 บรรทัดที่ 1
+    // 🟩 Header: บรรทัดที่ 1
     doc.fontSize(11).text(
       `รหัสบิล: ${bill.id}    จ่ายให้: ${bill.seller}    โดย: ___ เงินสด   ___ โอนผ่านบัญชีธนาคาร`,
       leftX,
@@ -160,31 +161,34 @@ router.get("/:id/pdf", async (req, res) => {
     );
 
     if (fs.existsSync(path.join(__dirname, "../picture/S__35299513pn.png"))) {
-      doc.image(path.join(__dirname, "../picture/S__35299513pn.png"), logoX, topY - 2, {
+      doc.image(path.join(__dirname, "../picture/S__35299513pn.png"), logoX, topY - 5, {
         fit: [logoSize, logoSize],
       });
     }
 
     doc.fontSize(12).text("บริษัท สุริยา 388 จำกัด", companyX, topY);
 
-    // 🟩 บรรทัดที่ 2
+    // 🟩 Header: บรรทัดที่ 2
     doc.fontSize(11).text(`เพื่อชำระ: ค่าทุเรียน`, leftX, topY + 18);
 
-    // 🟩 บรรทัดที่ 3
-    doc
-      .fontSize(11)
-      .text(`วันที่: ${dateStr} เวลา: ${timeStr}`, leftX, topY + 36);
+    // 🟩 Header: บรรทัดที่ 3
+    doc.fontSize(11).text(`วันที่: ${dateStr} เวลา: ${timeStr}`, leftX, topY + 36);
 
-    doc
-      .fontSize(9)
-      .text(
-        "เลขที่ 203/2 หมู่ 12 ต.บ้านนา อ.เมืองชุมพร จ.ชุมพร 86190 โทร: 081-078-2324 , 082-801-1225",
-        companyX,
-        topY + 36,
-        { align: "left", width: 260 }
-      );
+    doc.fontSize(9).text(
+      "เลขที่ 203/2 หมู่ 12 ต.บ้านนา อ.เมืองชุมพร จ.ชุมพร 86190",
+      companyX,
+      topY + 36,
+      { align: "left", width: 260 }
+    );
 
-    // ➕ ต่อด้วยเนื้อหาอื่น เช่น รายการที่ซื้อ, รวมเงิน, ลายเซ็น...
+    doc.fontSize(9).text(
+      "โทร: 081-078-2324 , 082-801-1225",
+      companyX,
+      topY + 48,
+      { align: "left", width: 260 }
+    );
+
+    // ➕ หัวข้อรายการ
     doc.moveDown(2);
     doc.fontSize(13).text("รายการที่ซื้อ:", leftX);
 
@@ -208,7 +212,7 @@ router.get("/:id/pdf", async (req, res) => {
       align: "right",
     });
 
-    // ➕ ลายเซ็น
+    // ➕ ช่องลายเซ็น
     doc.moveDown(1);
     const signatureY = doc.y;
     doc.text("...............................................", 40, signatureY);
