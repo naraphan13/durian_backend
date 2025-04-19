@@ -116,7 +116,7 @@ router.get("/:id/pdf", async (req, res) => {
     if (!bill) return res.status(404).send("Bill not found");
 
     const doc = new PDFDocument({
-      size: [648, 396], // A5 แนวนอน
+      size: [648, 396], // A5 landscape
       margin: 20,
     });
 
@@ -128,15 +128,15 @@ router.get("/:id/pdf", async (req, res) => {
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `inline; filename="bill-${bill.id}.pdf"`);
-
     doc.pipe(res);
 
-    // 🔧 ตำแหน่งพื้นฐาน
-    const leftX = 20;
+    // ===================== HEADER ===================== //
+    const logoPath = path.join(__dirname, "../picture/S__35299513pn.png");
     const logoSize = 60;
+    const topY = 20;
+    const leftX = 20;
     const logoX = 300;
     const companyX = logoX + logoSize + 10;
-    const topY = 20;
 
     const date = new Date(bill.date);
     const dateStr = new Intl.DateTimeFormat("th-TH", {
@@ -145,7 +145,6 @@ router.get("/:id/pdf", async (req, res) => {
       day: "numeric",
       timeZone: "Asia/Bangkok",
     }).format(date);
-
     const timeStr = new Intl.DateTimeFormat("th-TH", {
       hour: "2-digit",
       minute: "2-digit",
@@ -153,42 +152,40 @@ router.get("/:id/pdf", async (req, res) => {
       timeZone: "Asia/Bangkok",
     }).format(date);
 
-    // 🟩 Header: บรรทัดที่ 1
+    // 🟩 บรรทัดที่ 1
     doc.fontSize(11).text(
       `รหัสบิล: ${bill.id}    จ่ายให้: ${bill.seller}    โดย: ___ เงินสด   ___ โอนผ่านบัญชีธนาคาร`,
       leftX,
       topY
     );
 
-    if (fs.existsSync(path.join(__dirname, "../picture/S__35299513pn.png"))) {
-      doc.image(path.join(__dirname, "../picture/S__35299513pn.png"), logoX, topY - 5, {
-        fit: [logoSize, logoSize],
-      });
+    if (fs.existsSync(logoPath)) {
+      doc.image(logoPath, logoX, topY - 5, { fit: [logoSize, logoSize] });
     }
 
     doc.fontSize(12).text("บริษัท สุริยา 388 จำกัด", companyX, topY);
 
-    // 🟩 Header: บรรทัดที่ 2
+    // 🟩 บรรทัดที่ 2
     doc.fontSize(11).text(`เพื่อชำระ: ค่าทุเรียน`, leftX, topY + 18);
 
-    // 🟩 Header: บรรทัดที่ 3
+    doc.fontSize(11).text(
+      "เลขที่ 203/2 หมู่ 12 ต.บ้านนา อ.เมืองชุมพร จ.ชุมพร 86190",
+      companyX,
+      topY + 18,
+      { align: "left", width: 260 }
+    );
+
+    // 🟩 บรรทัดที่ 3
     doc.fontSize(11).text(`วันที่: ${dateStr} เวลา: ${timeStr}`, leftX, topY + 36);
 
-    doc.fontSize(9).text(
-      "เลขที่ 203/2 หมู่ 12 ต.บ้านนา อ.เมืองชุมพร จ.ชุมพร 86190",
+    doc.fontSize(11).text(
+      "โทร: 081-078-2324 , 082-801-1225",
       companyX,
       topY + 36,
       { align: "left", width: 260 }
     );
 
-    doc.fontSize(9).text(
-      "โทร: 081-078-2324 , 082-801-1225",
-      companyX,
-      topY + 48,
-      { align: "left", width: 260 }
-    );
-
-    // ➕ หัวข้อรายการ
+    // ===================== รายการที่ซื้อ ===================== //
     doc.moveDown(2);
     doc.fontSize(13).text("รายการที่ซื้อ:", leftX);
 
@@ -212,7 +209,7 @@ router.get("/:id/pdf", async (req, res) => {
       align: "right",
     });
 
-    // ➕ ช่องลายเซ็น
+    // ===================== ลายเซ็น ===================== //
     doc.moveDown(1);
     const signatureY = doc.y;
     doc.text("...............................................", 40, signatureY);
