@@ -168,19 +168,7 @@ router.get("/:id/pdf", async (req, res) => {
     }).format(date);
 
     doc.text(`เพื่อชำระ: ค่าทุเรียน    วันที่: ${dateStr} เวลา: ${timeStr}`);
-    const dateStr = new Intl.DateTimeFormat('th-TH', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      timeZone: 'Asia/Bangkok'
-    }).format(date);
-
-    const timeStr = new Intl.DateTimeFormat('th-TH', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-      timeZone: 'Asia/Bangkok'
-    }).format(date);
+  
 
     
     doc.moveDown(0.5);
