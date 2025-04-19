@@ -12,7 +12,10 @@ const authRouter = require("./routes/auth-router"); // ✅ เพิ่มตร
 
 const app = express();
 
-app.use(cors());
+app.use(cors({
+    origin: "https://dreamy-cheesecake-ba1c61.netlify.app",
+    credentials: true // ถ้าคุณส่ง cookie หรือ token ก็เปิดด้วย
+  }))
 app.use(morgan("dev"));
 app.use(express.json());
 
