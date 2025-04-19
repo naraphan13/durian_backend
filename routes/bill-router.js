@@ -116,18 +116,17 @@ router.get("/:id/pdf", async (req, res) => {
     if (!bill) return res.status(404).send("Bill not found");
 
     const doc = new PDFDocument({
-      size: [648, 396], // A5 แนวนอน
+      size: [648, 396], // A5 แนวนอน (9 x 5.5 นิ้ว)
       margin: 20,
     });
 
-    // ฟอนต์ธรรมดา
+    // ฟอนต์
     const fontPath = path.join(__dirname, "../fonts/THSarabunNew.ttf");
     if (fs.existsSync(fontPath)) {
       doc.registerFont("thai", fontPath);
       doc.font("thai");
     }
 
-    // ฟอนต์ตัวหนา
     const fontPathBold = path.join(__dirname, "../fonts/THSarabunNewBold.ttf");
     if (fs.existsSync(fontPathBold)) {
       doc.registerFont("thai-bold", fontPathBold);
@@ -137,16 +136,15 @@ router.get("/:id/pdf", async (req, res) => {
     res.setHeader("Content-Disposition", `inline; filename="bill-${bill.id}.pdf"`);
     doc.pipe(res);
 
-    // ===================== HEADER ===================== //
+    // ========== HEADER ========== //
     const logoPath = path.join(__dirname, "../picture/S__35299513pn.png");
     const logoSize = 70;
     const topY = 20;
 
-    // ตำแหน่งต่าง ๆ
-    const logoX = 250;
+    const logoX = 20;
     const logoY = topY + 10;
-    const companyX = 20;
-    const billInfoX = logoX + logoSize + 20;
+    const companyX = logoX + logoSize + 15;
+    const billInfoX = companyX + 250;
 
     const date = new Date(bill.date);
     const dateStr = new Intl.DateTimeFormat("th-TH", {
@@ -162,8 +160,13 @@ router.get("/:id/pdf", async (req, res) => {
       timeZone: "Asia/Bangkok",
     }).format(date);
 
-    // 🟩 ฝั่งซ้าย: ข้อมูลบริษัท
-    doc.font("thai").fontSize(12).text("บริษัท สุริยา388 จำกัด", companyX, topY);
+    // โลโก้ซ้ายสุด
+    if (fs.existsSync(logoPath)) {
+      doc.image(logoPath, logoX, logoY, { fit: [logoSize, logoSize] });
+    }
+
+    // ข้อมูลบริษัท
+    doc.font("thai-bold").fontSize(12).text("บริษัท สุริยา388 จำกัด", companyX, topY);
     doc.font("thai").fontSize(11).text(
       "เลขที่ 203/2 ม.12 ต.บ้านนา อ.เมืองชุมพร จ.ชุมพร 86190",
       companyX,
@@ -175,12 +178,7 @@ router.get("/:id/pdf", async (req, res) => {
       topY + 36
     );
 
-    // 🟩 กลาง: โลโก้
-    if (fs.existsSync(logoPath)) {
-      doc.image(logoPath, logoX, logoY, { fit: [logoSize, logoSize] });
-    }
-
-    // 🟩 ฝั่งขวา: ข้อมูลบิล
+    // ข้อมูลบิล (ฝั่งขวา)
     doc.font("thai").fontSize(11).text(
       `รหัสบิล: ${bill.id}    จ่ายให้: ${bill.seller}    โดย: ___ เงินสด   ___ โอนผ่านบัญชีธนาคาร`,
       billInfoX,
@@ -189,6 +187,7 @@ router.get("/:id/pdf", async (req, res) => {
     doc.text(`เพื่อชำระ: ค่าทุเรียน`, billInfoX, topY + 18);
     doc.text(`วันที่: ${dateStr} เวลา: ${timeStr}`, billInfoX, topY + 36);
 
+    // ใบสำคัญจ่าย (หัวกลางหน้า)
     doc.moveDown(0.5);
     doc.font("thai-bold").fontSize(15).text(
       "ใบสำคัญจ่าย PAYMENT VOUCHER",
@@ -196,11 +195,13 @@ router.get("/:id/pdf", async (req, res) => {
       doc.y,
       {
         align: "center",
-        width: doc.page.width
+        underline: true,
+        width: doc.page.width,
       }
     );
 
-    // ===================== รายการที่ซื้อ ===================== //
+    // ========== รายการที่ซื้อ ========== //
+    doc.moveDown(2);
     doc.font("thai-bold").fontSize(15).text("รายการที่ซื้อ:", 20);
 
     const summaryByVarietyGrade = {};
@@ -210,7 +211,7 @@ router.get("/:id/pdf", async (req, res) => {
       const subtotal = item.weight * item.pricePerKg;
 
       const line = `${i + 1}. ${item.variety} เกรด ${item.grade} | น้ำหนักต่อเข่ง: ${perBasket} กก. | น้ำหนักรวม: ${totalWeight} กก. x ${item.pricePerKg} บาท = ${subtotal.toLocaleString()} บาท`;
-      doc.font("thai-bold").fontSize(15).text(line, 20);
+      doc.font("thai").fontSize(13).text(line, 20);
 
       const key = `${item.variety} ${item.grade}`;
       if (!summaryByVarietyGrade[key]) summaryByVarietyGrade[key] = 0;
@@ -223,7 +224,7 @@ router.get("/:id/pdf", async (req, res) => {
       align: "right",
     });
 
-    // ===================== ลายเซ็น (ชิดล่างสุด) ===================== //
+    // ========== ลายเซ็น ========== //
     const signatureBaseY = doc.page.height - 60;
 
     doc.fontSize(11).text("...............................................", 40, signatureBaseY);
