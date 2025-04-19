@@ -163,7 +163,7 @@ router.get("/:id/pdf", async (req, res) => {
     }).format(date);
 
     // 🟩 ฝั่งซ้าย: ข้อมูลบริษัท
-    doc.font("thai-bold").fontSize(12).text("บริษัท สุริยา388 จำกัด", companyX, topY);
+    doc.font("thai").fontSize(12).text("บริษัท สุริยา388 จำกัด", companyX, topY);
     doc.font("thai").fontSize(11).text(
       "เลขที่ 203/2 ม.12 ต.บ้านนา อ.เมืองชุมพร จ.ชุมพร 86190",
       companyX,
@@ -189,6 +189,9 @@ router.get("/:id/pdf", async (req, res) => {
     doc.text(`เพื่อชำระ: ค่าทุเรียน`, billInfoX, topY + 18);
     doc.text(`วันที่: ${dateStr} เวลา: ${timeStr}`, billInfoX, topY + 36);
 
+    doc.moveDown(0.5);
+    doc.font("thai-bold").fontSize(13).text("ใบสำคัญจ่าย PAYMENT VOUCHER", { align: "center", underline: true });
+
     // ===================== รายการที่ซื้อ ===================== //
     doc.moveDown(2);
     doc.font("thai-bold").fontSize(15).text("รายการที่ซื้อ:", 20);
@@ -200,7 +203,7 @@ router.get("/:id/pdf", async (req, res) => {
       const subtotal = item.weight * item.pricePerKg;
 
       const line = `${i + 1}. ${item.variety} เกรด ${item.grade} | น้ำหนักต่อเข่ง: ${perBasket} กก. | น้ำหนักรวม: ${totalWeight} กก. x ${item.pricePerKg} บาท = ${subtotal.toLocaleString()} บาท`;
-      doc.font("thai").fontSize(13).text(line, 20);
+      doc.font("thai-bold").fontSize(15).text(line, 20);
 
       const key = `${item.variety} ${item.grade}`;
       if (!summaryByVarietyGrade[key]) summaryByVarietyGrade[key] = 0;
