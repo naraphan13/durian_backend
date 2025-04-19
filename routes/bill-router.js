@@ -132,20 +132,30 @@ router.get("/:id/pdf", async (req, res) => {
     doc.pipe(res);
 
     const logoPath = path.join(__dirname, "../picture/S__35299513pn.png");
-    const logoSize = 50;
-    const logoX = (doc.page.width - logoSize) / 2;
+    const logoSize = 60;
+    const padding = 20;
+    
+    // เตรียมความกว้างของ logo + ข้อความ (โดยประมาณ)
+    const textBlockWidth = 250;
+    const totalWidth = logoSize + padding + textBlockWidth;
+    
+    // คำนวณตำแหน่งเริ่มต้นให้อยู่กลางกระดาษ
+    const centerX = (doc.page.width - totalWidth) / 2;
+    const logoX = centerX;
     const logoY = 20;
-
+    const infoX = logoX + logoSize + padding;
+    const infoY = logoY;
+    
     if (fs.existsSync(logoPath)) {
       doc.image(logoPath, logoX, logoY, { fit: [logoSize, logoSize] });
     }
-
-    const textX = logoX + logoSize + 15;
-    const textY = logoY;
-
-    doc.fontSize(14).text("บริษัท สุริยา 388 จำกัด", { align: "center" });
-    doc.fontSize(9).text("เลขที่ 203/2 หมู่ 12 ต.บ้านนา อ.เมืองชุมพร จ.ชุมพร 86190", { align: "center" });
-    doc.text("โทร: 081-078-2324 , 082-801-1225", { align: "center" });
+    
+    doc
+      .fontSize(14)
+      .text("บริษัท สุริยา 388 จำกัด", infoX, infoY, { align: "left" })
+      .fontSize(9)
+      .text("เลขที่ 203/2 หมู่ 12 ต.บ้านนา อ.เมืองชุมพร จ.ชุมพร 86190", infoX, infoY + 20, { align: "left" })
+      .text("โทร: 081-078-2324 , 082-801-1225", infoX, infoY + 35, { align: "left" });
 
     doc.moveDown(0.5);
     doc.fontSize(13).text("ใบสำคัญจ่าย", { align: "center", underline: true });
