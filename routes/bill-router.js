@@ -133,9 +133,10 @@ router.get("/:id/pdf", async (req, res) => {
     // ===================== HEADER ===================== //
     const logoPath = path.join(__dirname, "../picture/S__35299513pn.png");
     const logoSize = 80;
-    const topY = 30;
+    const topY = 20;
     const leftX = 20;
     const logoX = 300;
+    const logoY = topY +10
     const companyX = logoX + logoSize + 10;
 
     const date = new Date(bill.date);
@@ -160,7 +161,7 @@ router.get("/:id/pdf", async (req, res) => {
     );
 
     if (fs.existsSync(logoPath)) {
-      doc.image(logoPath, logoX, topY - 5, { fit: [logoSize, logoSize] });
+      doc.image(logoPath, logoX, logoY - 5, { fit: [logoSize, logoSize] });
     }
 
     doc.fontSize(12).text("บริษัท สุริยา 388 จำกัด", companyX, topY);
