@@ -126,6 +126,11 @@ router.get("/:id/pdf", async (req, res) => {
       doc.font("thai");
     }
 
+    const fontPathBold = path.join(__dirname, "../fonts/THSarabunNewBold.ttf");
+if (fs.existsSync(fontPathBold)) {
+  doc.registerFont("thai-bold", fontPathBold);
+}
+
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `inline; filename="bill-${bill.id}.pdf"`);
     doc.pipe(res);
@@ -164,13 +169,13 @@ router.get("/:id/pdf", async (req, res) => {
       doc.image(logoPath, logoX, logoY, { fit: [logoSize, logoSize] });
     }
 
-    doc.fontSize(12).text("บริษัท สุริยา 388 จำกัด", companyX, topY);
+    doc.fontSize(12).text("บริษัท สุริยา388 จำกัด", companyX, topY);
 
     // 🟩 บรรทัดที่ 2
     doc.fontSize(11).text(`เพื่อชำระ: ค่าทุเรียน`, leftX, topY + 18);
 
     doc.fontSize(11).text(
-      "เลขที่ 203/2 หมู่ 12 ต.บ้านนา อ.เมืองชุมพร จ.ชุมพร 86190",
+      "เลขที่ 203/2 ม.12 ต.บ้านนา อ.เมืองชุมพร จ.ชุมพร 86190",
       companyX,
       topY + 18,
       { align: "left", width: 260 }
@@ -180,7 +185,7 @@ router.get("/:id/pdf", async (req, res) => {
     doc.fontSize(11).text(`วันที่: ${dateStr} เวลา: ${timeStr}`, leftX, topY + 36);
 
     doc.fontSize(11).text(
-      "โทร: 081-078-2324 , 082-801-1225",
+      "โทร: 081-078-2324 , 082-801-1225 , 095-905-5588",
       companyX,
       topY + 36,
       { align: "left", width: 260 }
@@ -188,7 +193,7 @@ router.get("/:id/pdf", async (req, res) => {
 
     // ===================== รายการที่ซื้อ ===================== //
     doc.moveDown(2);
-    doc.fontSize(13).text("รายการที่ซื้อ:", leftX);
+    doc.font("thai-bold").fontSize(15).text("รายการที่ซื้อ:", leftX);
 
     const summaryByVarietyGrade = {};
     bill.items.forEach((item, i) => {
@@ -197,7 +202,7 @@ router.get("/:id/pdf", async (req, res) => {
       const subtotal = item.weight * item.pricePerKg;
 
       const line = `${i + 1}. ${item.variety} เกรด ${item.grade} | น้ำหนักต่อเข่ง: ${perBasket} กก. | น้ำหนักรวม: ${totalWeight} กก. x ${item.pricePerKg} บาท = ${subtotal.toLocaleString()} บาท`;
-      doc.fontSize(13).text(line, leftX);
+      doc.font("thai-bold").fontSize(15).text(line, leftX);
 
       const key = `${item.variety} ${item.grade}`;
       if (!summaryByVarietyGrade[key]) summaryByVarietyGrade[key] = 0;
@@ -206,7 +211,7 @@ router.get("/:id/pdf", async (req, res) => {
 
     const total = Object.values(summaryByVarietyGrade).reduce((sum, val) => sum + val, 0);
     doc.moveDown(0.5);
-    doc.fontSize(15).text(`รวมเงิน: ${total.toLocaleString()} บาท`, {
+    doc.font("thai-bold").fontSize(15).text(`รวมเงิน: ${total.toLocaleString()} บาท`, {
       align: "right",
     });
 
