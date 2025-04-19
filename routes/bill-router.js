@@ -136,7 +136,7 @@ router.get("/:id/pdf", async (req, res) => {
     const topY = 20;
     const leftX = 20;
     const logoX = 300;
-    const logoY = topY + 20; // โลโก้เลื่อนลงเล็กน้อย
+    const logoY = topY + 10; // โลโก้เลื่อนลงเล็กน้อย
     const companyX = logoX + logoSize + 10;
 
     const date = new Date(bill.date);
@@ -206,7 +206,7 @@ router.get("/:id/pdf", async (req, res) => {
 
     const total = Object.values(summaryByVarietyGrade).reduce((sum, val) => sum + val, 0);
     doc.moveDown(0.5);
-    doc.fontSize(12).text(`รวมเงิน: ${total.toLocaleString()} บาท`, {
+    doc.fontSize(14).text(`รวมเงิน: ${total.toLocaleString()} บาท`, {
       align: "right",
     });
 
