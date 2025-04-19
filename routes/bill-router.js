@@ -197,7 +197,7 @@ router.get("/:id/pdf", async (req, res) => {
       const subtotal = item.weight * item.pricePerKg;
 
       const line = `${i + 1}. ${item.variety} เกรด ${item.grade} | น้ำหนักต่อเข่ง: ${perBasket} กก. | น้ำหนักรวม: ${totalWeight} กก. x ${item.pricePerKg} บาท = ${subtotal.toLocaleString()} บาท`;
-      doc.fontSize(11).text(line, leftX);
+      doc.fontSize(13).text(line, leftX);
 
       const key = `${item.variety} ${item.grade}`;
       if (!summaryByVarietyGrade[key]) summaryByVarietyGrade[key] = 0;
@@ -206,7 +206,7 @@ router.get("/:id/pdf", async (req, res) => {
 
     const total = Object.values(summaryByVarietyGrade).reduce((sum, val) => sum + val, 0);
     doc.moveDown(0.5);
-    doc.fontSize(14).text(`รวมเงิน: ${total.toLocaleString()} บาท`, {
+    doc.fontSize(15).text(`รวมเงิน: ${total.toLocaleString()} บาท`, {
       align: "right",
     });
 
