@@ -132,7 +132,7 @@ router.get("/:id/pdf", async (req, res) => {
 
     // ===================== HEADER ===================== //
     const logoPath = path.join(__dirname, "../picture/S__35299513pn.png");
-    const logoSize = 60;
+    const logoSize = 80;
     const topY = 20;
     const leftX = 20;
     const logoX = 300;
