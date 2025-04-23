@@ -34,16 +34,16 @@ router.post('/exportpdf', async (req, res) => {
   }
 
   // === หัวเอกสาร ===
-  doc.fontSize(16).text('ใบส่งออกทุเรียน SURIYA 388', 0, 30, { align: 'center' });
-  doc.fontSize(12).text(`วันที่: ${data.date}`, 120, 100);
-  doc.text(`ปลายทาง: ${data.city}`);
-  doc.text(`ตู้: ${data.containerInfo}`);
-  doc.text(`รหัสตู้: ${data.containerCode}`);
-  doc.text(`รหัสอ้างอิง: ${data.refCode}`);
+  doc.fontSize(16).text('ใบส่งออกทุเรียน SURIYA 388 / Durian Export Invoice - SURIYA 388', 0, 30, { align: 'center' });
+  doc.fontSize(12).text(`วันที่ / Date: ${data.date}`, 120, 100);
+  doc.text(`ปลายทาง / Destination: ${data.city}`);
+  doc.text(`ตู้ / Container: ${data.containerInfo}`);
+  doc.text(`รหัสตู้ / Container Code: ${data.containerCode}`);
+  doc.text(`รหัสอ้างอิง / Reference Code: ${data.refCode}`);
   doc.moveDown();
 
   // === รายการทุเรียน ===
-  doc.font('thai-bold').text('รายการทุเรียน', { underline: true });
+  doc.font('thai-bold').text('รายการทุเรียน / Durian Items', { underline: true });
   doc.font('thai');
   data.durianItems.forEach((item, i) => {
     const totalWeight = item.boxes * item.weightPerBox;
@@ -52,21 +52,21 @@ router.post('/exportpdf', async (req, res) => {
   });
 
   // === ค่าจัดการกล่อง ===
-  doc.moveDown().font('thai-bold').text('ค่าจัดการกล่อง');
+  doc.moveDown().font('thai-bold').text('ค่าจัดการกล่อง / Handling Costs');
   Object.entries(data.handlingCosts).forEach(([size, cost]) => {
     const total = cost.weight * cost.costPerKg;
     doc.font('thai').text(`${size}: ${cost.quantity} กล่อง × ${cost.weight} กก. × ${cost.costPerKg} = ${total.toLocaleString()} บาท`);
   });
 
   // === ค่ากล่อง ===
-  doc.moveDown().font('thai-bold').text('ค่ากล่อง');
+  doc.moveDown().font('thai-bold').text('ค่ากล่อง / Box Costs');
   Object.entries(data.boxCosts).forEach(([size, box]) => {
     const total = box.quantity * box.unitCost;
     doc.font('thai').text(`${size}: ${box.quantity} กล่อง × ${box.unitCost} = ${total.toLocaleString()} บาท`);
   });
 
   // === ค่าตรวจสาร ===
-  doc.moveDown().font('thai-bold').text(`ค่าตรวจสาร: ${data.inspectionFee.toLocaleString()} บาท`);
+  doc.moveDown().font('thai-bold').text(`ค่าตรวจสาร / Inspection Fee: ${data.inspectionFee.toLocaleString()} บาท`);
 
   // === รวมยอดทั้งหมด ===
   let total = data.inspectionFee;
@@ -76,17 +76,15 @@ router.post('/exportpdf', async (req, res) => {
     total += d.boxes * d.weightPerBox * d.pricePerKg;
   });
 
-  doc.moveDown().font('thai-bold').text(`รวมยอด: ${total.toLocaleString()} บาท`, { align: 'right' });
+  doc.moveDown().font('thai-bold').text(`รวมยอด / Total: ${total.toLocaleString()} บาท`, { align: 'right' });
 
   // === สรุปกล่องตามแบรนด์ ===
   if (data.brandSummary?.trim()) {
-    doc.moveDown(1); // ไม่มี addPage() แล้ว!
-    doc.font('thai-bold').fontSize(14).text('สรุปกล่องตามแบรนด์', { underline: true });
+    doc.moveDown(1);
+    doc.font('thai-bold').fontSize(14).text('สรุปกล่องตามแบรนด์ / Brand-wise Box Summary', { underline: true });
     doc.moveDown(0.5);
     doc.font('thai').fontSize(12).text(data.brandSummary);
   }
-
-  // 🔕 ไม่มีลายเซ็นแล้ว
 
   doc.end();
 });
