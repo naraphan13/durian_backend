@@ -5,7 +5,7 @@ const path = require('path');
 
 const router = express.Router();
 
-router.post('/api/export-pdf', async (req, res) => {
+router.post('/exportpdf', async (req, res) => {
   const data = req.body;
 
   const doc = new PDFDocument({ size: 'A4', margin: 30 });

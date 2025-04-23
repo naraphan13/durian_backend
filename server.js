@@ -22,7 +22,7 @@ app.use(express.json());
 // ✅ เส้นทาง API
 app.use("/v1/auth", authRouter);
 app.use("/v1/bills", billRouter); // ✅ ใช้ route บิลแทน todo
-app.use('/api', exportPdfRoute);
+app.use('/v1/export', exportPdfRoute);
 
 app.use(notFound);
 app.use(errorMiddleware);
