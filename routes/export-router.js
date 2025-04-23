@@ -54,8 +54,11 @@ router.post('/exportpdf', async (req, res) => {
   // === ค่าจัดการกล่อง ===
   doc.moveDown().font('thai-bold').text('ค่าจัดการกล่อง / Handling Costs');
   Object.entries(data.handlingCosts).forEach(([size, cost]) => {
-    const total = cost.weight * cost.costPerKg;
-    doc.font('thai').text(`${size}: ${cost.quantity} กล่อง × ${cost.weight} กก. × ${cost.costPerKg} = ${total.toLocaleString()} บาท`);
+    const totalWeight = cost.quantity * cost.weight;
+    const total = totalWeight * cost.costPerKg;
+    doc.font('thai').text(
+      `${size}: ${cost.quantity} กล่อง × ${cost.weight} กก./กล่อง = ${totalWeight} กก. × ${cost.costPerKg} บาท = ${total.toLocaleString()} บาท`
+    );
   });
 
   // === ค่ากล่อง ===
@@ -70,8 +73,12 @@ router.post('/exportpdf', async (req, res) => {
 
   // === รวมยอดทั้งหมด ===
   let total = data.inspectionFee;
-  Object.values(data.handlingCosts).forEach(c => total += c.weight * c.costPerKg);
-  Object.values(data.boxCosts).forEach(c => total += c.quantity * c.unitCost);
+  Object.values(data.handlingCosts).forEach(c => {
+    total += c.quantity * c.weight * c.costPerKg;
+  });
+  Object.values(data.boxCosts).forEach(c => {
+    total += c.quantity * c.unitCost;
+  });
   data.durianItems.forEach(d => {
     total += d.boxes * d.weightPerBox * d.pricePerKg;
   });
