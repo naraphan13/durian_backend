@@ -9,7 +9,7 @@ const notFound = require("./middlewares/notFound");
 // const authRouter = require("./routes");
 const billRouter = require("./routes/bill-router"); // ✅ เพิ่มตรงนี้
 const authRouter = require("./routes/auth-router"); // ✅ เพิ่มตรงนี้
-
+const exportPdfRoute = require('./routes/export-router');
 const app = express();
 
 app.use(cors({
@@ -22,6 +22,7 @@ app.use(express.json());
 // ✅ เส้นทาง API
 app.use("/v1/auth", authRouter);
 app.use("/v1/bills", billRouter); // ✅ ใช้ route บิลแทน todo
+app.use('/api', exportPdfRoute);
 
 app.use(notFound);
 app.use(errorMiddleware);
