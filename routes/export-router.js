@@ -1,6 +1,8 @@
 const express = require('express');
 const PDFDocument = require('pdfkit');
 const router = express.Router();
+const fs = require('fs');
+const path = require('path');
 
 router.post('/export-pdf', async (req, res) => {
     const data = req.body;
