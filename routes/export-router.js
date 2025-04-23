@@ -80,19 +80,13 @@ router.post('/exportpdf', async (req, res) => {
 
   // === สรุปกล่องตามแบรนด์ ===
   if (data.brandSummary?.trim()) {
-    doc.addPage();
+    doc.moveDown(1); // ไม่มี addPage() แล้ว!
     doc.font('thai-bold').fontSize(14).text('สรุปกล่องตามแบรนด์', { underline: true });
     doc.moveDown(0.5);
     doc.font('thai').fontSize(12).text(data.brandSummary);
   }
 
-  // === ลายเซ็น ===
-//   const bottom = doc.page.height - 80;
-//   doc.fontSize(10).text('ผู้จัดทำ', 60, bottom);
-//   doc.text('_________________________', 40, bottom + 20);
-
-//   doc.text('ผู้ตรวจสอบ', 360, bottom);
-//   doc.text('_________________________', 340, bottom + 20);
+  // 🔕 ไม่มีลายเซ็นแล้ว
 
   doc.end();
 });
