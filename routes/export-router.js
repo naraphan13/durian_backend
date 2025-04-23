@@ -87,12 +87,12 @@ router.post('/exportpdf', async (req, res) => {
   }
 
   // === ลายเซ็น ===
-  const bottom = doc.page.height - 80;
-  doc.fontSize(10).text('ผู้จัดทำ', 60, bottom);
-  doc.text('_________________________', 40, bottom + 20);
+//   const bottom = doc.page.height - 80;
+//   doc.fontSize(10).text('ผู้จัดทำ', 60, bottom);
+//   doc.text('_________________________', 40, bottom + 20);
 
-  doc.text('ผู้ตรวจสอบ', 360, bottom);
-  doc.text('_________________________', 340, bottom + 20);
+//   doc.text('ผู้ตรวจสอบ', 360, bottom);
+//   doc.text('_________________________', 340, bottom + 20);
 
   doc.end();
 });
