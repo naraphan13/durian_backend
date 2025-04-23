@@ -32,7 +32,7 @@ router.post('/export-pdf', async (req, res) => {
       doc.image(logoPath, 30, 30, { width: 60 });
     }
   
-    // === หัวหน้าเอกสาร ===
+    // === หัวเอกสาร ===
     doc.fontSize(16).text('ใบส่งออกทุเรียน SURIYA 388', 0, 30, { align: 'center' });
     doc.fontSize(12).text(`วันที่: ${data.date}`, 120, 100);
     doc.text(`ปลายทาง: ${data.city}`);
@@ -50,21 +50,24 @@ router.post('/export-pdf', async (req, res) => {
       doc.text(`${i + 1}. ${item.variety} เกรด ${item.grade} | ${item.boxes} กล่อง × ${item.weightPerBox} กก. = ${totalWeight} กก. × ${item.pricePerKg} บาท = ${totalPrice.toLocaleString()} บาท`);
     });
   
+    // === ค่าจัดการกล่อง ===
     doc.moveDown().font('thai-bold').text('ค่าจัดการกล่อง');
     Object.entries(data.handlingCosts).forEach(([size, cost]) => {
       const total = cost.weight * cost.costPerKg;
       doc.font('thai').text(`${size}: ${cost.quantity} กล่อง × ${cost.weight} กก. × ${cost.costPerKg} = ${total.toLocaleString()} บาท`);
     });
   
+    // === ค่ากล่อง ===
     doc.moveDown().font('thai-bold').text('ค่ากล่อง');
     Object.entries(data.boxCosts).forEach(([size, box]) => {
       const total = box.quantity * box.unitCost;
       doc.font('thai').text(`${size}: ${box.quantity} กล่อง × ${box.unitCost} = ${total.toLocaleString()} บาท`);
     });
   
+    // === ค่าตรวจสาร ===
     doc.moveDown().font('thai-bold').text(`ค่าตรวจสาร: ${data.inspectionFee.toLocaleString()} บาท`);
   
-    // รวมยอดทั้งหมด
+    // === รวมยอดทั้งหมด ===
     let total = data.inspectionFee;
     Object.values(data.handlingCosts).forEach(c => total += c.weight * c.costPerKg);
     Object.values(data.boxCosts).forEach(c => total += c.quantity * c.unitCost);
@@ -74,15 +77,15 @@ router.post('/export-pdf', async (req, res) => {
   
     doc.moveDown().font('thai-bold').text(`รวมยอด: ${total.toLocaleString()} บาท`, { align: 'right' });
   
-    // ลายเซ็น
-    const bottom = doc.page.height - 80;
-    doc.fontSize(10).text('ผู้จัดทำ', 60, bottom);
-    doc.text('_________________________', 40, bottom + 20);
+    // === สรุปกล่องตามแบรนด์ ===
+    if (data.brandSummary?.trim()) {
+      doc.addPage();
+      doc.font('thai-bold').fontSize(14).text('สรุปกล่องตามแบรนด์', { underline: true });
+      doc.moveDown(0.5);
+      doc.font('thai').fontSize(12).text(data.brandSummary);
+    }
   
-    doc.text('ผู้ตรวจสอบ', 360, bottom);
-    doc.text('_________________________', 340, bottom + 20);
-  
-    doc.end();
+    
   });
   
   module.exports = router;
