@@ -245,7 +245,7 @@ router.get("/:id/pdf", async (req, res) => {
       topY
     );
     doc.text(`เพื่อชำระ: ค่าทุเรียน`, billInfoX, topY + 18);
-    doc.text(`วันที่: ${dateStr} เวลา: ${timeStr}`, billInfoX, topY + 36);
+    doc.text(`วันที่: ${dateStr} เวลา: ${timeStr} น.`, billInfoX, topY + 36);
 
     // ใบสำคัญจ่าย (หัวกลางหน้า)
     doc.moveDown(0.5);
