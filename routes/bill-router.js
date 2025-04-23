@@ -175,9 +175,8 @@ router.get("/:id/pdf", async (req, res) => {
     if (!bill) return res.status(404).send("Bill not found");
 
     const doc = new PDFDocument({
-      size: [648, 396], // A5 แนวนอน (9 x 5.5 นิ้ว)
+      size: [396, 648], // A5 แนวนอน (9 x 5.5 นิ้ว)
       margin: 20,
-      layout: "landscape",
     });
 
     // ฟอนต์
