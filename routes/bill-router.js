@@ -280,7 +280,7 @@ router.get("/:id/pdf", async (req, res) => {
     const total = Object.values(summaryByVarietyGrade).reduce((sum, val) => sum + val, 0);
     doc.moveDown(0.5);
     doc.font("thai-bold").fontSize(15).text(`รวมเงิน: ${total.toLocaleString()} บาท`, {
-      align: "right",
+      align: "center",
     });
 
     // ========== ลายเซ็น ========== //
