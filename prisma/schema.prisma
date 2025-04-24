@@ -42,3 +42,23 @@ model Item {
   pricePerKg Float
   bill       Bill    @relation(fields: [billId], references: [id])
 }
+
+
+
+
+
+model ExportContainer {
+  id             Int      @id @default(autoincrement())
+  date           String
+  city           String
+  containerInfo  String
+  containerCode  String
+  refCode        String
+  durianItems    Json     // เก็บเป็น array ของรายการทุเรียน
+  handlingCosts  Json     // ข้อมูลค่าจัดการกล่อง
+  boxCosts       Json     // ข้อมูลค่ากล่อง
+  inspectionFee  Float
+  brandSummary   String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}

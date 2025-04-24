@@ -120,6 +120,7 @@ router.get('/', async (req, res) => {
     const exports = await prisma.exportContainer.findMany({
       orderBy: { date: 'desc' },
     });
+    console.log(exports);
     res.json(exports);
   } catch (err) {
     res.status(500).json({ error: 'ไม่สามารถดึงรายการได้', details: err });
