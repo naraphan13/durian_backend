@@ -2,6 +2,7 @@ const express = require('express');
 const PDFDocument = require('pdfkit');
 const fs = require('fs');
 const path = require('path');
+const prisma = require("../models/prisma");
 
 const router = express.Router();
 
@@ -93,6 +94,73 @@ router.post('/exportpdf', async (req, res) => {
   }
 
   doc.end();
+});
+
+
+
+
+
+
+
+
+router.post('/', async (req, res) => {
+  try {
+    const newExport = await prisma.exportContainer.create({
+      data: req.body,
+    });
+    res.json(newExport);
+  } catch (err) {
+    res.status(500).json({ error: 'เกิดข้อผิดพลาดในการบันทึก', details: err });
+  }
+});
+
+// READ ALL: ดึงรายการเอกสารทั้งหมด
+router.get('/', async (req, res) => {
+  try {
+    const exports = await prisma.exportContainer.findMany({
+      orderBy: { date: 'desc' },
+    });
+    res.json(exports);
+  } catch (err) {
+    res.status(500).json({ error: 'ไม่สามารถดึงรายการได้', details: err });
+  }
+});
+
+// READ ONE: ดึงเอกสารตาม ID
+router.get('/:id', async (req, res) => {
+  try {
+    const exportDoc = await prisma.exportContainer.findUnique({
+      where: { id: parseInt(req.params.id) },
+    });
+    res.json(exportDoc);
+  } catch (err) {
+    res.status(500).json({ error: 'ไม่พบเอกสารนี้', details: err });
+  }
+});
+
+// UPDATE: แก้ไขเอกสารตาม ID
+router.put('/:id', async (req, res) => {
+  try {
+    const updated = await prisma.exportContainer.update({
+      where: { id: parseInt(req.params.id) },
+      data: req.body,
+    });
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ error: 'อัปเดตไม่สำเร็จ', details: err });
+  }
+});
+
+// DELETE: ลบเอกสารตาม ID
+router.delete('/:id', async (req, res) => {
+  try {
+    await prisma.exportContainer.delete({
+      where: { id: parseInt(req.params.id) },
+    });
+    res.json({ message: 'ลบสำเร็จ' });
+  } catch (err) {
+    res.status(500).json({ error: 'ลบไม่สำเร็จ', details: err });
+  }
 });
 
 module.exports = router;
