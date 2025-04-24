@@ -226,30 +226,30 @@ router.get("/:id/pdf", async (req, res) => {
     }
 
     // ข้อมูลบริษัท
-    doc.font("thai").fontSize(11).text("บริษัท สุริยา388 จำกัด", companyX, topY);
-    doc.font("thai").fontSize(11).text(
+    doc.font("thai").fontSize(13).text("บริษัท สุริยา388 จำกัด", companyX, topY);
+    doc.font("thai").fontSize(13).text(
       "เลขที่ 203/2 ม.12 ต.บ้านนา อ.เมืองชุมพร จ.ชุมพร 86190",
       companyX,
       topY + 18
     );
-    doc.text(
+    doc.font("thai").fontSize(13).text(
       "โทร: 081-078-2324 , 082-801-1225 , 095-905-5588",
       companyX,
       topY + 36
     );
 
     // ข้อมูลบิล (ฝั่งขวา)
-    doc.font("thai").fontSize(11).text(
+    doc.font("thai").fontSize(13).text(
       `รหัสบิล: ${bill.id}    จ่ายให้: ${bill.seller}    โดย: ___ เงินสด   ___ โอนผ่านบัญชีธนาคาร`,
       billInfoX,
       topY
     );
-    doc.text(`เพื่อชำระ: ค่าทุเรียน`, billInfoX, topY + 18);
-    doc.text(`วันที่: ${dateStr} เวลา: ${timeStr} น.`, billInfoX, topY + 36);
+    doc.font("thai").fontSize(13).text(`เพื่อชำระ: ค่าทุเรียน`, billInfoX, topY + 18);
+    doc.font("thai").fontSize(13).text(`วันที่: ${dateStr} เวลา: ${timeStr} น.`, billInfoX, topY + 36);
 
     // ใบสำคัญจ่าย (หัวกลางหน้า)
     doc.moveDown(0.5);
-    doc.font("thai-bold").fontSize(15).text(
+    doc.font("thai-bold").fontSize(17).text(
       "ใบสำคัญจ่าย PAYMENT VOUCHER",
       0,
       doc.y,
@@ -261,7 +261,7 @@ router.get("/:id/pdf", async (req, res) => {
 
     // ========== รายการที่ซื้อ ========== //
     doc.moveDown(0.5);
-    doc.font("thai-bold").fontSize(15).text("รายการที่ซื้อ:", 20);
+    doc.font("thai-bold").fontSize(17).text("รายการที่ซื้อ:", 20);
 
     const summaryByVarietyGrade = {};
     bill.items.forEach((item, i) => {
@@ -270,7 +270,7 @@ router.get("/:id/pdf", async (req, res) => {
       const subtotal = item.weight * item.pricePerKg;
 
       const line = `${i + 1}. ${item.variety} เกรด ${item.grade} | น้ำหนักต่อเข่ง: ${perBasket} กก. | น้ำหนักรวม: ${totalWeight} กก. x ${item.pricePerKg} บาท = ${subtotal.toLocaleString()} บาท`;
-      doc.font("thai-bold").fontSize(15).text(line, 20);
+      doc.font("thai-bold").fontSize(17).text(line, 20);
 
       const key = `${item.variety} ${item.grade}`;
       if (!summaryByVarietyGrade[key]) summaryByVarietyGrade[key] = 0;
@@ -279,7 +279,7 @@ router.get("/:id/pdf", async (req, res) => {
 
     const total = Object.values(summaryByVarietyGrade).reduce((sum, val) => sum + val, 0);
     doc.moveDown(0.5);
-    doc.font("thai-bold").fontSize(15).text(`รวมเงิน: ${total.toLocaleString()} บาท`, {
+    doc.font("thai-bold").fontSize(17).text(`รวมเงิน: ${total.toLocaleString()} บาท`, {
       align: "center",
     });
 
@@ -287,12 +287,12 @@ router.get("/:id/pdf", async (req, res) => {
     const signatureBaseY = doc.page.height - 60;
 
     doc.fontSize(11).text("...............................................", 40, signatureBaseY);
-    doc.fontSize(9).text("ผู้จ่ายเงิน", 40, signatureBaseY + 12);
-    doc.text("ลงวันที่: ........../........../..........", 40, signatureBaseY + 24);
+    doc.fontSize(11).text("ผู้จ่ายเงิน", 40, signatureBaseY + 12);
+    doc.fontSize(11).text("ลงวันที่: ........../........../..........", 40, signatureBaseY + 24);
 
-    doc.text("...............................................", 340, signatureBaseY);
-    doc.fontSize(9).text("ผู้รับเงิน", 340, signatureBaseY + 12);
-    doc.text("ลงวันที่: ........../........../..........", 340, signatureBaseY + 24);
+    doc.fontSize(11).text("...............................................", 340, signatureBaseY);
+    doc.fontSize(11).text("ผู้รับเงิน", 340, signatureBaseY + 12);
+    doc.fontSize(11).text("ลงวันที่: ........../........../..........", 340, signatureBaseY + 24);
 
     doc.end();
   } catch (err) {
