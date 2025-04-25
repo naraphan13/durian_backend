@@ -183,7 +183,7 @@ router.post('/:id/pdf', async (req, res) => {
       const pdfData = Buffer.concat(buffers);
       res.writeHead(200, {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename=packing-${data.date}.pdf`,
+        'Content-Disposition': `inline; filename=packing-${data.date}.pdf`,
         'Content-Length': pdfData.length,
       });
       res.end(pdfData);
@@ -200,7 +200,7 @@ router.post('/:id/pdf', async (req, res) => {
     }
 
     doc.font('thai-bold').fontSize(16).text('ใบสรุปค่าแพ็คทุเรียน / Durian Packing Cost Summary', { align: 'center' });
-    doc.moveDown();
+    
     doc.fontSize(12).font('thai').text(`วันที่: ${data.date}`);
     doc.moveDown();
 
@@ -215,7 +215,7 @@ router.post('/:id/pdf', async (req, res) => {
     let totalDeduction = 0;
     const deductions = data.deductions || [];
     if (Array.isArray(deductions) && deductions.length > 0) {
-      doc.moveDown();
+      
       doc.font('thai-bold').fontSize(13).text('รายละเอียดหักเบิก:', { underline: true });
       deductions.forEach((d, idx) => {
         totalDeduction += d.amount || 0;
@@ -225,7 +225,7 @@ router.post('/:id/pdf', async (req, res) => {
 
     const finalTotal = total - totalDeduction;
 
-    doc.moveDown();
+    
     doc.font('thai-bold').text(`รวมทั้งหมด: ${total.toLocaleString()} บาท`);
     if (totalDeduction > 0) {
       doc.text(`หักเบิก: ${totalDeduction.toLocaleString()} บาท`);
