@@ -7,7 +7,7 @@ const router = express.Router();
 
 router.post('/pdf', async (req, res) => {
   const data = req.body;
-  const doc = new PDFDocument({ size: 'A4', margin: 40 });
+  const doc = new PDFDocument({ size: [648, 396], margin: 40 }); // 9 x 5.5 inch in points
 
   const buffers = [];
   doc.on('data', buffers.push.bind(buffers));
@@ -22,7 +22,9 @@ router.post('/pdf', async (req, res) => {
   });
 
   const fontPath = path.join(__dirname, '../fonts/THSarabunNew.ttf');
+  const fontPathBold = path.join(__dirname, '../fonts/THSarabunNewBold.ttf');
   if (fs.existsSync(fontPath)) doc.registerFont('thai', fontPath).font('thai');
+  if (fs.existsSync(fontPathBold)) doc.registerFont('thai-bold', fontPathBold);
 
   // โลโก้บริษัท
   const logoPath = path.join(__dirname, '../picture/S__5275654png (1).png');
@@ -30,20 +32,20 @@ router.post('/pdf', async (req, res) => {
     doc.image(logoPath, 40, 30, { width: 60 });
   }
 
-  doc.fontSize(16).text('ใบสรุปค่าแพ็คทุเรียน / Durian Packing Cost Summary', { align: 'center' });
+  doc.font('thai-bold').fontSize(16).text('ใบสรุปค่าแพ็คทุเรียน / Durian Packing Cost Summary', { align: 'center' });
 
   doc.moveDown();
-  doc.fontSize(12).text(`วันที่: ${data.date}`);
+  doc.fontSize(12).font('thai').text(`วันที่: ${data.date}`);
   doc.moveDown();
 
-  doc.fontSize(13).text('รายละเอียดค่าแพ็ค:', { underline: true });
+  doc.fontSize(13).font('thai-bold').text('รายละเอียดค่าแพ็ค:', { underline: true });
 
   const totalBig = data.bigBox.quantity * data.bigBox.pricePerBox;
   const totalSmall = data.smallBox.quantity * data.smallBox.pricePerBox;
   const total = totalBig + totalSmall;
   const remaining = total - data.deduction;
 
-  doc.text(`กล่องใหญ่: ${data.bigBox.quantity} กล่อง × ${data.bigBox.pricePerBox} บาท = ${totalBig.toLocaleString()} บาท`);
+  doc.font('thai').text(`กล่องใหญ่: ${data.bigBox.quantity} กล่อง × ${data.bigBox.pricePerBox} บาท = ${totalBig.toLocaleString()} บาท`);
   doc.text(`กล่องเล็ก: ${data.smallBox.quantity} กล่อง × ${data.smallBox.pricePerBox} บาท = ${totalSmall.toLocaleString()} บาท`);
   doc.moveDown();
 
@@ -51,12 +53,15 @@ router.post('/pdf', async (req, res) => {
   doc.text(`หักค่าของ / หักเบิก: ${data.deduction.toLocaleString()} บาท`);
   doc.text(`คงเหลือที่ต้องจ่าย: ${remaining.toLocaleString()} บาท`, { underline: true });
 
-  doc.moveDown(2);
-  doc.text('......................................................', 72);
-  doc.text('ผู้จ่ายเงิน / Paid By', 72);
-
-  doc.text('......................................................', 350);
-  doc.text('ผู้รับเงิน / Received By', 350);
+  doc.moveDown(3);
+  doc.font('thai').text(
+    '......................................................                  ......................................................',
+    { align: 'center' }
+  );
+  doc.text(
+    'ผู้จ่ายเงิน / Paid By                                            ผู้รับเงิน / Received By',
+    { align: 'center' }
+  );
 
   doc.end();
 });
