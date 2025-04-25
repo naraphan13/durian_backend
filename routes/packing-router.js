@@ -48,7 +48,6 @@ router.post('/pdf', async (req, res) => {
   doc.fontSize(13).font('thai-bold').text('รายละเอียดค่าแพ็ค:', { underline: true });
   doc.font('thai-bold').text(`กล่องใหญ่: ${quantityBig} กล่อง × ${priceBig} บาท = ${totalBig.toLocaleString()} บาท`);
   doc.font('thai-bold').text(`กล่องเล็ก: ${quantitySmall} กล่อง × ${priceSmall} บาท = ${totalSmall.toLocaleString()} บาท`);
-
   doc.moveDown();
 
   let totalDeduction = 0;
