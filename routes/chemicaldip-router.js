@@ -172,7 +172,6 @@ router.get('/:id/pdf', async (req, res) => {
     doc.moveDown();
     doc.fontSize(12).font('thai').text(`วันที่: ${data.date}`);
     doc.moveDown();
-
     doc.fontSize(15).font('thai-bold').text('รายละเอียดค่าชุบน้ำยา:', { underline: false });
     doc.fontSize(19).font('thai-bold').text(`น้ำหนักทุเรียน: ${data.weight} ตัน`);
     doc.fontSize(19).font('thai-bold').text(`ราคาต่อตัน: ${data.pricePerKg} บาท`);
