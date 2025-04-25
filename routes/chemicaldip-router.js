@@ -40,8 +40,8 @@ router.post('/pdf', async (req, res) => {
   const total = data.weight * data.pricePerKg;
 
   doc.fontSize(15).font('thai-bold').text('รายละเอียดค่าชุบน้ำยา:', { underline: false });
-  doc.fontSize(15).font('thai').text(`น้ำหนักทุเรียน: ${data.weight} กก.`);
-  doc.fontSize(15).text(`ราคาต่อกก.: ${data.pricePerKg} บาท`);
+  doc.fontSize(15).font('thai').text(`น้ำหนักทุเรียน: ${data.weight} ตัน`);
+  doc.fontSize(15).text(`ราคาต่อตัน: ${data.pricePerKg} บาท`);
   doc.fontSize(15).text(`รวมทั้งหมด: ${total.toLocaleString()} บาท`, { underline: false });
 
   doc.moveDown(3);
