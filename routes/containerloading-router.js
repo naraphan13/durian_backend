@@ -41,7 +41,8 @@ router.post('/pdf', async (req, res) => {
   let total = 0;
   data.containers.forEach((c, i) => {
     total += c.price;
-    doc.font('thai').text(`ตู้ที่ ${i + 1}: ${c.containerCode} × ${c.price.toLocaleString()} บาท`);
+    const label = c.label?.trim() || `ตู้ที่ ${i + 1}`;
+    doc.font('thai').text(`${label}: ${c.containerCode} × ${c.price.toLocaleString()} บาท`);
   });
 
   doc.moveDown();
