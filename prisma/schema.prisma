@@ -62,3 +62,17 @@ model ExportContainer {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 }
+
+
+
+model Packing {
+  id               Int      @id @default(autoincrement())
+  date             String
+  bigBoxQuantity   Int
+  bigBoxPrice      Float
+  smallBoxQuantity Int
+  smallBoxPrice    Float
+  deductions       Json      // Array ของรายการหักเบิก
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+}
