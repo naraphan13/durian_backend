@@ -208,28 +208,28 @@ router.post('/:id/pdf', async (req, res) => {
     const totalSmall = data.smallBoxQuantity * data.smallBoxPrice;
     const total = totalBig + totalSmall;
 
-    doc.font('thai-bold').fontSize(13).text('รายละเอียดค่าแพ็ค:', { underline: true });
-    doc.font('thai').fontSize(13).text(`กล่องใหญ่: ${data.bigBoxQuantity} กล่อง × ${data.bigBoxPrice} บาท = ${totalBig.toLocaleString()} บาท`);
-    doc.fontSize(13).text(`กล่องเล็ก: ${data.smallBoxQuantity} กล่อง × ${data.smallBoxPrice} บาท = ${totalSmall.toLocaleString()} บาท`);
+    doc.font('thai-bold').fontSize(16).text('รายละเอียดค่าแพ็ค:', { underline: true });
+    doc.font('thai').fontSize(16).text(`กล่องใหญ่: ${data.bigBoxQuantity} กล่อง × ${data.bigBoxPrice} บาท = ${totalBig.toLocaleString()} บาท`);
+    doc.fontSize(16).text(`กล่องเล็ก: ${data.smallBoxQuantity} กล่อง × ${data.smallBoxPrice} บาท = ${totalSmall.toLocaleString()} บาท`);
 
     let totalDeduction = 0;
     const deductions = data.deductions || [];
     if (Array.isArray(deductions) && deductions.length > 0) {
       
-      doc.font('thai-bold').fontSize(13).text('รายละเอียดหักเบิก:', { underline: true });
+      doc.font('thai-bold').fontSize(16).text('รายละเอียดหักเบิก:', { underline: true });
       deductions.forEach((d, idx) => {
         totalDeduction += d.amount || 0;
-        doc.fontSize(13).font('thai').text(`${idx + 1}. ${d.label || '-'}: ${d.amount.toLocaleString()} บาท`);
+        doc.fontSize(16).font('thai').text(`${idx + 1}. ${d.label || '-'}: ${d.amount.toLocaleString()} บาท`);
       });
     }
 
     const finalTotal = total - totalDeduction;
 
     
-    doc.fontSize(13).font('thai-bold').text(`รวมทั้งหมด: ${total.toLocaleString()} บาท`);
+    doc.fontSize(16).font('thai-bold').text(`รวมทั้งหมด: ${total.toLocaleString()} บาท`);
     if (totalDeduction > 0) {
-      doc.fontSize(13).text(`หักเบิก: ${totalDeduction.toLocaleString()} บาท`);
-      doc.fontSize(13).text(`คงเหลือหลังหัก: ${finalTotal.toLocaleString()} บาท`);
+      doc.fontSize(16).text(`หักเบิก: ${totalDeduction.toLocaleString()} บาท`);
+      doc.fontSize(16).text(`คงเหลือหลังหัก: ${finalTotal.toLocaleString()} บาท`);
     }
 
     doc.moveDown();
