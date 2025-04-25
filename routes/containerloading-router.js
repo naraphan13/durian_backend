@@ -33,7 +33,7 @@ router.post('/pdf', async (req, res) => {
 
   doc.font('thai-bold').fontSize(16).text('ใบสรุปค่าขึ้นตู้ทุเรียน / Durian Container Loading Cost Summary', { align: 'center' });
   doc.moveDown();
-  doc.fontSize(12).font('thai').text(`วันที่: ${data.date}`);
+  doc.fontSize(13).font('thai').text(`วันที่: ${data.date}`);
   doc.moveDown();
 
   doc.fontSize(15).font('thai-bold').text('รายละเอียดค่าขึ้นตู้:', { underline: false });
