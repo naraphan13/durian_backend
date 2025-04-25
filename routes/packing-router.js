@@ -208,8 +208,8 @@ router.post('/:id/pdf', async (req, res) => {
     const total = totalBig + totalSmall;
 
     doc.font('thai-bold').fontSize(16).text('รายละเอียดค่าแพ็ค:', { underline: true });
-    doc.font('thai').fontSize(16).text(`กล่องใหญ่: ${data.bigBoxQuantity} กล่อง × ${data.bigBoxPrice} บาท = ${totalBig.toLocaleString()} บาท`);
-    doc.fontSize(16).text(`กล่องเล็ก: ${data.smallBoxQuantity} กล่อง × ${data.smallBoxPrice} บาท = ${totalSmall.toLocaleString()} บาท`);
+    doc.font('thai-bold').fontSize(16).text(`กล่องใหญ่: ${data.bigBoxQuantity} กล่อง × ${data.bigBoxPrice} บาท = ${totalBig.toLocaleString()} บาท`);
+    doc.font('thai-bold').fontSize(16).text(`กล่องเล็ก: ${data.smallBoxQuantity} กล่อง × ${data.smallBoxPrice} บาท = ${totalSmall.toLocaleString()} บาท`);
 
     let totalDeduction = 0;
     const deductions = data.deductions || [];
@@ -218,7 +218,7 @@ router.post('/:id/pdf', async (req, res) => {
       doc.font('thai-bold').fontSize(16).text('รายละเอียดหักเบิก:', { underline: true });
       deductions.forEach((d, idx) => {
         totalDeduction += d.amount || 0;
-        doc.fontSize(16).font('thai').text(`${idx + 1}. ${d.label || '-'}: ${d.amount.toLocaleString()} บาท`);
+        doc.fontSize(16).font('thai-bold').text(`${idx + 1}. ${d.label || '-'}: ${d.amount.toLocaleString()} บาท`);
       });
     }
 
