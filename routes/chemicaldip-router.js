@@ -150,7 +150,7 @@ router.get('/:id/pdf', async (req, res) => {
       const pdfData = Buffer.concat(buffers);
       res.writeHead(200, {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename=chemical-dip-${data.date}.pdf`,
+        'Content-Disposition': `inline; filename=chemical-dip-${data.date}.pdf`,
         'Content-Length': pdfData.length,
       });
       res.end(pdfData);
