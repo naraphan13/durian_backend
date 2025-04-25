@@ -33,20 +33,20 @@ router.post('/pdf', async (req, res) => {
 
   doc.font('thai-bold').fontSize(16).text('ใบสรุปค่าขึ้นตู้ทุเรียน / Durian Container Loading Cost Summary', { align: 'center' });
   doc.moveDown();
-  doc.fontSize(13).font('thai').text(`วันที่: ${data.date}`);
+  doc.fontSize(14).font('thai').text(`วันที่: ${data.date}`);
   doc.moveDown();
 
-  doc.fontSize(15).font('thai-bold').text('รายละเอียดค่าขึ้นตู้:', { underline: false });
+  doc.fontSize(20).font('thai-bold').text('รายละเอียดค่าขึ้นตู้:', { underline: false });
 
   let total = 0;
   data.containers.forEach((c, i) => {
     total += c.price;
     const label = c.label?.trim() || `ตู้ที่ ${i + 1}`;
-    doc.fontSize(15).font('thai').text(`${label}: ${c.containerCode} × ${c.price.toLocaleString()} บาท`);
+    doc.fontSize(20).font('thai').text(`${label}: ${c.containerCode} × ${c.price.toLocaleString()} บาท`);
   });
 
   doc.moveDown();
-  doc.fontSize(15).font('thai-bold').text(`รวมทั้งหมด: ${total.toLocaleString()} บาท`, { underline: false });
+  doc.fontSize(20).font('thai-bold').text(`รวมทั้งหมด: ${total.toLocaleString()} บาท`, { underline: false });
 
   doc.moveDown(3);
   doc.font('thai').text(

@@ -31,7 +31,7 @@ router.post('/pdf', async (req, res) => {
     doc.image(logoPath, 40, 30, { width: 60 });
   }
 
-  doc.font('thai-bold').fontSize(16).text('ใบสรุปค่าชุบทุเรียน / Durian Chemical Dip Summary', { align: 'center' });
+  doc.font('thai-bold').fontSize(16).text('ใบสรุปค่าชุบน้ำยาทุเรียน / Durian Chemical Dip Summary', { align: 'center' });
 
   doc.moveDown();
   doc.fontSize(12).font('thai').text(`วันที่: ${data.date}`);
@@ -40,11 +40,11 @@ router.post('/pdf', async (req, res) => {
   const total = data.weight * data.pricePerKg;
 
   doc.fontSize(15).font('thai-bold').text('รายละเอียดค่าชุบน้ำยา:', { underline: false });
-  doc.fontSize(15).font('thai').text(`น้ำหนักทุเรียน: ${data.weight} ตัน`);
-  doc.fontSize(15).text(`ราคาต่อตัน: ${data.pricePerKg} บาท`);
-  doc.fontSize(15).text(`รวมทั้งหมด: ${total.toLocaleString()} บาท`, { underline: false });
+  doc.fontSize(19).font('thai').text(`น้ำหนักทุเรียน: ${data.weight} ตัน`);
+  doc.fontSize(19).text(`ราคาต่อตัน: ${data.pricePerKg} บาท`);
+  doc.fontSize(19).text(`รวมทั้งหมด: ${total.toLocaleString()} บาท`, { underline: false });
 
-  doc.moveDown(3);
+  doc.moveDown();
   doc.font('thai').text(
     '......................................................                  ......................................................',
     { align: 'center' }
