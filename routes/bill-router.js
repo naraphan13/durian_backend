@@ -240,11 +240,11 @@ router.get("/:id/pdf", async (req, res) => {
 
     // ข้อมูลบิล (ฝั่งขวา)
     doc.font("thai").fontSize(13).text(
-      `รหัสบิล: ${bill.id}    จ่ายให้: ${bill.seller}    โดย: ___ เงินสด   ___ โอนผ่านบัญชีธนาคาร`,
+      `รหัสบิล: ${bill.id}    จ่ายให้: ${bill.seller}    `,
       billInfoX,
       topY
     );
-    doc.font("thai").fontSize(13).text(`เพื่อชำระ: ค่าทุเรียน`, billInfoX, topY + 18);
+    doc.font("thai").fontSize(13).text(`โดย: ___ เงินสด   ___ โอนผ่านบัญชีธนาคาร   เพื่อชำระ: ค่าทุเรียน`, billInfoX, topY + 18);
     doc.font("thai").fontSize(13).text(`วันที่: ${dateStr} เวลา: ${timeStr} น.`, billInfoX, topY + 36);
 
     // ใบสำคัญจ่าย (หัวกลางหน้า)
