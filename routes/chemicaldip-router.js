@@ -174,9 +174,9 @@ router.get('/:id/pdf', async (req, res) => {
     doc.moveDown();
 
     doc.fontSize(15).font('thai-bold').text('รายละเอียดค่าชุบน้ำยา:', { underline: false });
-    doc.fontSize(19).font('thai').text(`น้ำหนักทุเรียน: ${data.weight} ตัน`);
-    doc.fontSize(19).text(`ราคาต่อตัน: ${data.pricePerKg} บาท`);
-    doc.fontSize(19).text(`รวมทั้งหมด: ${total.toLocaleString()} บาท`);
+    doc.fontSize(19).font('thai-bold').text(`น้ำหนักทุเรียน: ${data.weight} ตัน`);
+    doc.fontSize(19).font('thai-bold').text(`ราคาต่อตัน: ${data.pricePerKg} บาท`);
+    doc.fontSize(19).font('thai-bold').text(`รวมทั้งหมด: ${total.toLocaleString()} บาท`);
 
     doc.moveDown();
     doc.font('thai').text(

@@ -46,8 +46,8 @@ router.post('/pdf', async (req, res) => {
   const total = totalBig + totalSmall;
 
   doc.fontSize(13).font('thai-bold').text('รายละเอียดค่าแพ็ค:', { underline: true });
-  doc.font('thai').text(`กล่องใหญ่: ${quantityBig} กล่อง × ${priceBig} บาท = ${totalBig.toLocaleString()} บาท`);
-  doc.text(`กล่องเล็ก: ${quantitySmall} กล่อง × ${priceSmall} บาท = ${totalSmall.toLocaleString()} บาท`);
+  doc.font('thai-bold').text(`กล่องใหญ่: ${quantityBig} กล่อง × ${priceBig} บาท = ${totalBig.toLocaleString()} บาท`);
+  doc.font('thai-bold').text(`กล่องเล็ก: ${quantitySmall} กล่อง × ${priceSmall} บาท = ${totalSmall.toLocaleString()} บาท`);
 
   doc.moveDown();
 
@@ -58,7 +58,7 @@ router.post('/pdf', async (req, res) => {
       const label = d.label || '-';
       const amount = d.amount || 0;
       totalDeduction += amount;
-      doc.font('thai').text(`${idx + 1}. ${label}: ${amount.toLocaleString()} บาท`);
+      doc.font('thai-bold').text(`${idx + 1}. ${label}: ${amount.toLocaleString()} บาท`);
     });
     doc.moveDown();
   }
