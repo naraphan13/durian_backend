@@ -76,3 +76,26 @@ model Packing {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 }
+
+
+
+model ChemicalDip {
+  id         Int      @id @default(autoincrement())
+  date       String
+  weight     Float
+  pricePerKg Float
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+
+
+
+
+model ContainerLoading {
+  id         Int      @id @default(autoincrement())
+  date       String
+  containers Json     // array ของ { label, containerCode, price }
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
