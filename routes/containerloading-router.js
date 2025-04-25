@@ -48,8 +48,8 @@ router.post('/pdf', async (req, res) => {
   doc.moveDown();
   doc.fontSize(20).font('thai-bold').text(`รวมทั้งหมด: ${total.toLocaleString()} บาท`, { underline: false });
 
-  doc.moveDown(3);
-  doc.font('thai').text(
+  doc.moveDown();
+  doc.fontSize(15).font('thai').text(
     '......................................................                  ......................................................',
     { align: 'center' }
   );
