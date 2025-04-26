@@ -36,7 +36,7 @@ router.post('/exportpdf', async (req, res) => {
 
   // === หัวเอกสาร ===
   doc.font('thai-bold').fontSize(26).text('ใบส่งออกทุเรียน SURIYA 388 / Durian Export Invoice - SURIYA 388', 0, 50, { align: 'center' });
-  doc.moveDown();
+
 
   doc.font('thai').fontSize(20).text(`วันที่ / Date: ${data.date}`, 150, 150);
   doc.text(`ปลายทาง / Destination: ${data.city}`);
