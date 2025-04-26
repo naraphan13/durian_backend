@@ -92,7 +92,6 @@ router.post('/exportpdf', async (req, res) => {
 
   // === สรุปกล่องตามแบรนด์ ===
   if (data.brandSummary?.trim()) {
-    doc.addPage(); // สรุปแบรนด์หน้าใหม่เลยถ้ามี
     doc.font('thai-bold').fontSize(28).text('สรุปกล่องตามแบรนด์ / Brand-wise Box Summary', { underline: true, align: 'center' });
     doc.moveDown();
     doc.font('thai').fontSize(20).text(data.brandSummary);
