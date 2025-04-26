@@ -89,7 +89,7 @@ router.post('/exportpdf', async (req, res) => {
   });
 
   doc.moveDown().font('thai-bold').fontSize(26).text(`รวมยอด / Total: ${total.toLocaleString()} บาท`, { align: 'right' });
-
+  doc.moveDown(1);
   // === สรุปกล่องตามแบรนด์ ===
   if (data.brandSummary?.trim()) {
     doc.font('thai-bold').fontSize(28).text('สรุปกล่องตามแบรนด์ / Brand-wise Box Summary', { underline: true, align: 'center' });
