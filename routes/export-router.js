@@ -9,7 +9,7 @@ const router = express.Router();
 router.post('/exportpdf', async (req, res) => {
   const data = req.body;
 
-  const doc = new PDFDocument({ size: 'A3', margin: 50 }); // เปลี่ยนเป็น A3 และขยาย margin
+  const doc = new PDFDocument({ size: [841.89, 1400], margin: 50 }); // เปลี่ยนเป็น A3 และขยาย margin
   let buffers = [];
   doc.on('data', buffers.push.bind(buffers));
   doc.on('end', () => {
