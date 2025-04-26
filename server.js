@@ -16,7 +16,7 @@ const containerLoadingRouter = require('./routes/containerloading-router');
 const app = express();
 
 app.use(cors({
-    origin: "https://dreamy-cheesecake-ba1c61.netlify.app",
+    origin: "https://suriya-388.netlify.app",
     credentials: true // ถ้าคุณส่ง cookie หรือ token ก็เปิดด้วย
   }))
 app.use(morgan("dev"));
