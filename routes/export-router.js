@@ -57,7 +57,7 @@ router.post('/exportpdf', async (req, res) => {
 
   // === ค่าจัดการกล่อง ===
   doc.moveDown().font('thai-bold').fontSize(24).text('ค่าจัดการกล่อง / Handling Costs');
-  doc.moveDown();
+  
   Object.entries(data.handlingCosts).forEach(([size, cost]) => {
     const total = cost.weight * cost.costPerKg;
     doc.font('thai').fontSize(18).text(
@@ -67,7 +67,7 @@ router.post('/exportpdf', async (req, res) => {
 
   // === ค่ากล่อง ===
   doc.moveDown().font('thai-bold').fontSize(24).text('ค่ากล่อง / Box Costs');
-  doc.moveDown();
+  
   Object.entries(data.boxCosts).forEach(([size, box]) => {
     const total = box.quantity * box.unitCost;
     doc.font('thai').fontSize(18).text(`${size}: ${box.quantity} กล่อง × ${box.unitCost} = ${total.toLocaleString()} บาท`);
