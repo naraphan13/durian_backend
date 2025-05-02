@@ -99,3 +99,37 @@ model ContainerLoading {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 }
+
+
+
+model CuttingBill {
+  id              Int                @id @default(autoincrement())
+  cutterName      String
+  startDate       DateTime
+  endDate         DateTime
+  mainWeight      Float
+  mainPrice       Float
+  paid            Boolean           @default(false)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  deductItems     DeductItem[]
+  extraDeductions ExtraDeduction[]
+}
+
+model DeductItem {
+  id             Int          @id @default(autoincrement())
+  label          String
+  qty            Float
+  unitPrice      Float
+  cuttingBillId  Int
+  cuttingBill    CuttingBill @relation(fields: [cuttingBillId], references: [id], onDelete: Cascade)
+}
+
+model ExtraDeduction {
+  id             Int          @id @default(autoincrement())
+  label          String
+  amount         Float
+  cuttingBillId  Int
+  cuttingBill    CuttingBill @relation(fields: [cuttingBillId], references: [id], onDelete: Cascade)
+}

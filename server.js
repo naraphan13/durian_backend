@@ -13,6 +13,7 @@ const exportPdfRoute = require('./routes/export-router');
 const packingRoute = require('./routes/packing-router');
 const chemicalDipRouter = require('./routes/chemicaldip-router');
 const containerLoadingRouter = require('./routes/containerloading-router');
+const cuttingRoute = require('./routes/cutting-router');
 const app = express();
 
 app.use(cors({
@@ -29,6 +30,7 @@ app.use('/v1/export', exportPdfRoute);
 app.use('/v1/packing', packingRoute);
 app.use('/v1/chemicaldip', chemicalDipRouter);
 app.use('/v1/containerloading', containerLoadingRouter);
+app.use("/v1/cuttingbills", cuttingRoute);
 
 
 
