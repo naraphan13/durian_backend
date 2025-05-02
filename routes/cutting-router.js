@@ -133,29 +133,36 @@ router.get("/:id/pdf", async (req, res) => {
       if (!bill) return res.status(404).send("Bill not found");
   
       const doc = new PDFDocument({
-        size: [396, 648], // A5 แนวนอน (9 x 5.5 นิ้ว)
+        size: [396, 648], // A5 แนวนอน
         margin: 20,
         layout: "landscape",
       });
   
-      // === ฟอนต์ไทย ===
+      const fullWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+  
+      // ฟอนต์
       const fontPath = path.join(__dirname, "../fonts/THSarabunNew.ttf");
-      const fontBold = path.join(__dirname, "../fonts/THSarabunNewBold.ttf");
-      if (fs.existsSync(fontPath)) doc.registerFont("thai", fontPath).font("thai");
-      if (fs.existsSync(fontBold)) doc.registerFont("thai-bold", fontBold);
+      const fontBoldPath = path.join(__dirname, "../fonts/THSarabunNewBold.ttf");
+      if (fs.existsSync(fontPath)) {
+        doc.registerFont("thai", fontPath);
+        doc.font("thai");
+      }
+      if (fs.existsSync(fontBoldPath)) {
+        doc.registerFont("thai-bold", fontBoldPath);
+      }
   
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader("Content-Disposition", `inline; filename="cutting-${bill.id}.pdf"`);
       doc.pipe(res);
   
-      // === Header Logo / Company ===
+      // Header
       const logoPath = path.join(__dirname, "../picture/S__5275654png (1).png");
       const logoSize = 70;
-      const topY = 20;
       const logoX = 20;
-      const logoY = topY + 10;
+      const logoY = 30;
       const companyX = logoX + logoSize + 15;
       const billInfoX = companyX + 250;
+      const topY = 20;
   
       if (fs.existsSync(logoPath)) {
         doc.image(logoPath, logoX, logoY, { fit: [logoSize, logoSize] });
@@ -171,13 +178,14 @@ router.get("/:id/pdf", async (req, res) => {
       doc.text(`สายตัด: ${bill.cutterName}`, billInfoX, topY + 18);
       doc.text(`วันที่พิมพ์: ${printDateStr}`, billInfoX, topY + 36);
   
-      // === Heading Center ===
+      // หัวข้อกลางหน้า
       doc.moveDown(0.5);
       doc.font("thai-bold").fontSize(17).text("ใบรายการค่าตัดทุเรียน", {
         align: "center",
+        width: fullWidth,
       });
   
-      // === Summary Centered ===
+      // รายละเอียดน้ำหนักรวม
       doc.moveDown(0.5);
       const startDateStr = new Date(bill.startDate).toLocaleDateString("th-TH", {
         day: "numeric",
@@ -193,14 +201,19 @@ router.get("/:id/pdf", async (req, res) => {
   
       doc.font("thai").fontSize(14).text(`ช่วงวันที่: ${startDateStr} - ${endDateStr}`, {
         align: "center",
+        width: fullWidth,
       });
+  
       doc.text(
         `น้ำหนักรวม: ${bill.mainWeight} กก. × ${bill.mainPrice} บาท = ${mainTotal.toLocaleString()} บาท`,
-        { align: "center" }
+        {
+          align: "center",
+          width: fullWidth,
+        }
       );
   
-      // === รายการหัก ===
-      doc.moveDown(0.5);
+      // รายการหัก
+      doc.moveDown(0.7);
       doc.font("thai-bold").fontSize(15).text("รายการหัก:", 20);
       bill.deductItems.forEach((item, i) => {
         const subtotal = item.qty * item.unitPrice;
@@ -215,8 +228,8 @@ router.get("/:id/pdf", async (req, res) => {
         0
       );
   
-      // === รายการหักเพิ่มเติม ===
-      doc.moveDown(0.5);
+      // หักเพิ่มเติม
+      doc.moveDown(0.7);
       doc.font("thai-bold").fontSize(15).text("รายการหักเพิ่มเติม:", 20);
       bill.extraDeductions.forEach((item, i) => {
         doc.font("thai").fontSize(14).text(
@@ -232,13 +245,14 @@ router.get("/:id/pdf", async (req, res) => {
   
       const netTotal = mainTotal - deductTotal - extraTotal;
   
-      // === สรุปยอดสุทธิ ===
-      doc.moveDown(0.5);
+      // ยอดสุทธิกลางหน้า
+      doc.moveDown(0.8);
       doc.font("thai-bold").fontSize(16).text(`ยอดสุทธิ: ${netTotal.toLocaleString()} บาท`, {
         align: "center",
+        width: fullWidth,
       });
   
-      // === ลายเซ็น ===
+      // ลายเซ็น
       const sigY = doc.page.height - 60;
   
       doc.fontSize(11).text("...............................................", 40, sigY);
@@ -258,6 +272,5 @@ router.get("/:id/pdf", async (req, res) => {
 
 
 
-  
 
 module.exports = router;
