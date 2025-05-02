@@ -140,12 +140,10 @@ router.get("/:id/pdf", async (req, res) => {
   
       const fullWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
   
-      // ฟอนต์
       const fontPath = path.join(__dirname, "../fonts/THSarabunNew.ttf");
       const fontBoldPath = path.join(__dirname, "../fonts/THSarabunNewBold.ttf");
       if (fs.existsSync(fontPath)) {
-        doc.registerFont("thai", fontPath);
-        doc.font("thai");
+        doc.registerFont("thai", fontPath).font("thai");
       }
       if (fs.existsSync(fontBoldPath)) {
         doc.registerFont("thai-bold", fontBoldPath);
@@ -155,7 +153,7 @@ router.get("/:id/pdf", async (req, res) => {
       res.setHeader("Content-Disposition", `inline; filename="cutting-${bill.id}.pdf"`);
       doc.pipe(res);
   
-      // Header
+      // ========== HEADER ========== //
       const logoPath = path.join(__dirname, "../picture/S__5275654png (1).png");
       const logoSize = 70;
       const logoX = 20;
@@ -178,15 +176,12 @@ router.get("/:id/pdf", async (req, res) => {
       doc.text(`สายตัด: ${bill.cutterName}`, billInfoX, topY + 18);
       doc.text(`วันที่พิมพ์: ${printDateStr}`, billInfoX, topY + 36);
   
-      // หัวข้อกลางหน้า
-      doc.moveDown(0.5);
-      doc.font("thai-bold").fontSize(17).text("ใบรายการค่าตัดทุเรียน", {
-        align: "center",
-        width: fullWidth,
-      });
+      // ========== CENTER HEADING ========== //
+      const centerOpts = { align: "center", width: fullWidth };
   
-      // รายละเอียดน้ำหนักรวม
       doc.moveDown(0.5);
+      doc.font("thai-bold").fontSize(17).text("ใบรายการค่าตัดทุเรียน", 0, undefined, centerOpts);
+  
       const startDateStr = new Date(bill.startDate).toLocaleDateString("th-TH", {
         day: "numeric",
         month: "short",
@@ -197,23 +192,20 @@ router.get("/:id/pdf", async (req, res) => {
         month: "short",
         year: "numeric",
       });
+  
       const mainTotal = bill.mainWeight * bill.mainPrice;
   
-      doc.font("thai").fontSize(14).text(`ช่วงวันที่: ${startDateStr} - ${endDateStr}`, {
-        align: "center",
-        width: fullWidth,
-      });
-  
+      doc.moveDown(0.5);
+      doc.font("thai").fontSize(14).text(`ช่วงวันที่: ${startDateStr} - ${endDateStr}`, 0, undefined, centerOpts);
       doc.text(
         `น้ำหนักรวม: ${bill.mainWeight} กก. × ${bill.mainPrice} บาท = ${mainTotal.toLocaleString()} บาท`,
-        {
-          align: "center",
-          width: fullWidth,
-        }
+        0,
+        undefined,
+        centerOpts
       );
   
-      // รายการหัก
-      doc.moveDown(0.7);
+      // ========== รายการหัก ========== //
+      doc.moveDown(0.8);
       doc.font("thai-bold").fontSize(15).text("รายการหัก:", 20);
       bill.deductItems.forEach((item, i) => {
         const subtotal = item.qty * item.unitPrice;
@@ -228,8 +220,8 @@ router.get("/:id/pdf", async (req, res) => {
         0
       );
   
-      // หักเพิ่มเติม
-      doc.moveDown(0.7);
+      // ========== รายการหักเพิ่มเติม ========== //
+      doc.moveDown(0.8);
       doc.font("thai-bold").fontSize(15).text("รายการหักเพิ่มเติม:", 20);
       bill.extraDeductions.forEach((item, i) => {
         doc.font("thai").fontSize(14).text(
@@ -245,14 +237,11 @@ router.get("/:id/pdf", async (req, res) => {
   
       const netTotal = mainTotal - deductTotal - extraTotal;
   
-      // ยอดสุทธิกลางหน้า
-      doc.moveDown(0.8);
-      doc.font("thai-bold").fontSize(16).text(`ยอดสุทธิ: ${netTotal.toLocaleString()} บาท`, {
-        align: "center",
-        width: fullWidth,
-      });
+      // ========== YIELD CENTER ========== //
+      doc.moveDown(1);
+      doc.font("thai-bold").fontSize(16).text(`ยอดสุทธิ: ${netTotal.toLocaleString()} บาท`, 0, undefined, centerOpts);
   
-      // ลายเซ็น
+      // ========== SIGNATURE ========== //
       const sigY = doc.page.height - 60;
   
       doc.fontSize(11).text("...............................................", 40, sigY);
