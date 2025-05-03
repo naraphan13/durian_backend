@@ -143,7 +143,6 @@ router.get("/:id/pdf", async (req, res) => {
   try {
     const data = await prisma.containerLoading.findUnique({
       where: { id: parseInt(req.params.id) },
-      include: { containers: true },
     });
 
     if (!data) return res.status(404).send("ไม่พบข้อมูล");
@@ -155,12 +154,10 @@ router.get("/:id/pdf", async (req, res) => {
     });
 
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader(
-      "Content-Disposition",
-      `inline; filename="container-loading-${data.id}.pdf"`
-    );
+    res.setHeader("Content-Disposition", `inline; filename="container-loading-${data.id}.pdf"`);
     doc.pipe(res);
 
+    // === โหลดฟอนต์ ===
     const fontPath = path.join(__dirname, "../fonts/THSarabunNew.ttf");
     const fontBoldPath = path.join(__dirname, "../fonts/THSarabunNewBold.ttf");
     if (fs.existsSync(fontPath)) doc.registerFont("thai", fontPath).font("thai");
@@ -194,77 +191,49 @@ router.get("/:id/pdf", async (req, res) => {
     }
 
     doc.font("thai").fontSize(13).text("บริษัท สุริยา388 จำกัด", companyX, topY);
-    doc
-      .font("thai")
-      .fontSize(13)
-      .text("เลขที่ 203/2 ม.12 ต.บ้านนา อ.เมืองชุมพร จ.ชุมพร 86190", companyX, topY + 18);
-    doc
-      .font("thai")
-      .fontSize(13)
-      .text("โทร: 081-078-2324 , 082-801-1225 , 095-905-5588", companyX, topY + 36);
+    doc.font("thai").fontSize(13).text("เลขที่ 203/2 ม.12 ต.บ้านนา อ.เมืองชุมพร จ.ชุมพร 86190", companyX, topY + 18);
+    doc.font("thai").fontSize(13).text("โทร: 081-078-2324 , 082-801-1225 , 095-905-5588", companyX, topY + 36);
 
-    // ข้อมูลบิล (ขวา)
-    doc
-      .font("thai")
-      .fontSize(13)
-      .text(`รหัสบิล: ${data.id}    จ่ายให้: __________`, billInfoX, topY);
-    doc
-      .font("thai")
-      .fontSize(13)
-      .text(
-        `โดย: ___ เงินสด   ___ โอนผ่านบัญชีธนาคาร   เพื่อชำระ: ค่าขึ้นตู้ทุเรียน`,
-        billInfoX,
-        topY + 18
-      );
-    doc
-      .font("thai")
-      .fontSize(13)
-      .text(`วันที่: ${dateStr} เวลา: ${timeStr} น.`, billInfoX, topY + 36);
+    doc.font("thai").fontSize(13).text(`รหัสบิล: ${data.id}    จ่ายให้: __________`, billInfoX, topY);
+    doc.font("thai").fontSize(13).text(`โดย: ___ เงินสด   ___ โอนผ่านบัญชีธนาคาร   เพื่อชำระ: ค่าขึ้นตู้ทุเรียน`, billInfoX, topY + 18);
+    doc.font("thai").fontSize(13).text(`วันที่: ${dateStr} เวลา: ${timeStr} น.`, billInfoX, topY + 36);
 
     // === TITLE CENTER ===
+    const fullWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
     doc.moveDown(0.5);
-    doc.font("thai-bold").fontSize(17).text(
-      "ใบสำคัญจ่าย PAYMENT VOUCHER",
-      0,
-      doc.y,
-      { align: "center", width: doc.page.width }
-    );
+    doc.font("thai-bold").fontSize(17).text("ใบสำคัญจ่าย PAYMENT VOUCHER", 0, doc.y, {
+      align: "center",
+      width: fullWidth,
+    });
 
-    // === รายการขึ้นตู้ ===
+    // === รายการ ===
     doc.moveDown(1);
     doc.font("thai-bold").fontSize(16).text("รายละเอียดค่าขึ้นตู้:", 20);
-    doc
-      .font("thai")
-      .fontSize(16)
-      .text("ใบสรุปค่าขึ้นตู้ทุเรียน", 20);
+    doc.font("thai").fontSize(16).text("ใบสรุปค่าขึ้นตู้ทุเรียน Durian Container Loading Cost Summary", 30);
+
+    const containers = Array.isArray(data.containers) ? data.containers : [];
 
     let total = 0;
-    (data.containers || []).forEach((c, i) => {
+    containers.forEach((c, i) => {
       const label = c.label?.trim() || `ตู้ที่ ${i + 1}`;
       const price = c.price || 0;
       total += price;
 
-      doc
-        .font("thai")
-        .fontSize(18)
-        .text(`${label}: ${c.containerCode || "-"} × ${price.toLocaleString()} บาท`, 30);
+      doc.font("thai").fontSize(16).text(`${label}: ${c.containerCode || "-"} × ${price.toLocaleString()} บาท`, 30);
     });
 
     doc.moveDown();
-    doc
-      .font("thai-bold")
-      .fontSize(20)
-      .text(`รวมทั้งหมด: ${total.toLocaleString()} บาท`, 20);
+    doc.font("thai-bold").fontSize(18).text(`รวมทั้งหมด: ${total.toLocaleString()} บาท`, 20);
 
     // === ลายเซ็น ===
-    const signatureBaseY = doc.page.height - 60;
-    doc.fontSize(11).text("...............................................", 40, signatureBaseY);
-    doc.fontSize(11).text("ผู้จ่ายเงิน", 40, signatureBaseY + 12);
-    doc.fontSize(11).text("ลงวันที่: ........../........../..........", 40, signatureBaseY + 24);
+    const sigY = doc.page.height - 60;
+    doc.fontSize(11).text("...............................................", 40, sigY);
+    doc.text("ผู้จ่ายเงิน", 40, sigY + 12);
+    doc.text("ลงวันที่: ........../........../..........", 40, sigY + 24);
 
-    doc.fontSize(11).text("...............................................", 340, signatureBaseY);
-    doc.fontSize(11).text("ผู้รับเงิน", 340, signatureBaseY + 12);
-    doc.fontSize(11).text("ลงวันที่: ........../........../..........", 340, signatureBaseY + 24);
+    doc.text("...............................................", 340, sigY);
+    doc.text("ผู้รับเงิน", 340, sigY + 12);
+    doc.text("ลงวันที่: ........../........../..........", 340, sigY + 24);
 
     doc.end();
   } catch (err) {

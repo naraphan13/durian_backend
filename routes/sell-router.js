@@ -166,8 +166,8 @@ router.get("/:id/pdf", async (req, res) => {
 
     // ===== รายการขาย =====
     doc.moveDown(0.5);
+    doc.font("thai").fontSize(16).text("ใบเสร็จการขายทุเรียน", 20);
     doc.font("thai-bold").fontSize(17).text("รายการที่ขาย:", 20);
-    doc.font("thai").fontSize(16).text("ใบเสร็จการขายทุเรียน", 30);
 
     let total = 0;
     bill.items.forEach((item, i) => {
