@@ -196,12 +196,11 @@ router.get("/:id/pdf", async (req, res) => {
       const mainTotal = bill.mainWeight * bill.mainPrice;
   
       doc.moveDown(0.5);
-      doc.font("thai").fontSize(14).text(`ช่วงวันที่: ${startDateStr} - ${endDateStr}`, 0, undefined, centerOpts);
-      doc.text(
+      doc.font("thai-bold").fontSize(14).text(`ช่วงวันที่: ${startDateStr} - ${endDateStr}`, 0, undefined);
+      doc.font("thai-bold").text(
         `น้ำหนักรวม: ${bill.mainWeight} กก. × ${bill.mainPrice} บาท = ${mainTotal.toLocaleString()} บาท`,
         0,
-        undefined,
-        centerOpts
+        undefined
       );
   
       // ========== รายการหัก ========== //
@@ -209,7 +208,7 @@ router.get("/:id/pdf", async (req, res) => {
       doc.font("thai-bold").fontSize(15).text("รายการหัก:", 20);
       bill.deductItems.forEach((item, i) => {
         const subtotal = item.qty * item.unitPrice;
-        doc.font("thai").fontSize(14).text(
+        doc.font("thai-bold").fontSize(14).text(
           `${i + 1}. ${item.label} - ${item.qty} × ${item.unitPrice} = ${subtotal.toLocaleString()} บาท`,
           20
         );
@@ -224,7 +223,7 @@ router.get("/:id/pdf", async (req, res) => {
       doc.moveDown(0.8);
       doc.font("thai-bold").fontSize(15).text("รายการหักเพิ่มเติม:", 20);
       bill.extraDeductions.forEach((item, i) => {
-        doc.font("thai").fontSize(14).text(
+        doc.font("thai-bold").fontSize(14).text(
           `${i + 1}. ${item.label} - ${item.amount.toLocaleString()} บาท`,
           20
         );
