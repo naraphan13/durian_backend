@@ -215,7 +215,7 @@ router.get("/:id/pdf", async (req, res) => {
       const calculated = item.qty * item.unitPrice;
       const line = `${i + 1}. ${item.label} - ${item.qty} × ${item.unitPrice} = ${calculated.toLocaleString()} บาท`;
       if (item.actualAmount != null) {
-        doc.font("thai").fontSize(14).text(`${line} - กำหนดเอง: ${item.actualAmount.toLocaleString()} บาท`, 20);
+        doc.font("thai").fontSize(14).text(`${line} - หัก: ${item.actualAmount.toLocaleString()} บาท`, 20);
       } else {
         doc.font("thai").fontSize(14).text(line, 20);
       }
