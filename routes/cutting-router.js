@@ -168,7 +168,6 @@ router.get("/:id/pdf", async (req, res) => {
     res.setHeader("Content-Disposition", `inline; filename="cutting-${bill.id}.pdf"`);
     doc.pipe(res);
 
-    // HEADER
     const logoPath = path.join(__dirname, "../picture/S__5275654png (1).png");
     const logoSize = 70;
     const logoX = 20;
@@ -190,7 +189,6 @@ router.get("/:id/pdf", async (req, res) => {
     doc.text(`สายตัด: ${bill.cutterName}`, billInfoX, topY + 18);
     doc.text(`วันที่พิมพ์: ${printDateStr}`, billInfoX, topY + 36);
 
-    // HEADING CENTER
     const centerOpts = { align: "center", width: fullWidth };
 
     doc.moveDown(0.5);
@@ -206,7 +204,7 @@ router.get("/:id/pdf", async (req, res) => {
 
     doc.moveDown(0.5);
     doc.font("thai").fontSize(14).text(`วันที่: ${billDateStr}`, 20);
-    doc.font("thai").text(
+    doc.text(
       `น้ำหนักรวม: ${bill.mainWeight} กก. × ${bill.mainPrice} บาท = ${mainTotal.toLocaleString()} บาท`,
       20
     );
@@ -214,17 +212,14 @@ router.get("/:id/pdf", async (req, res) => {
     // รายการหัก
     doc.moveDown(0.4);
     doc.font("thai-bold").fontSize(15).text("รายการหัก:", 20);
-
     bill.deductItems.forEach((item, i) => {
-      const subtotal = item.actualAmount ?? item.qty * item.unitPrice;
-      const method = item.actualAmount != null
-        ? `กำหนดเอง: ${subtotal.toLocaleString()}`
-        : `${item.qty} × ${item.unitPrice} = ${subtotal.toLocaleString()}`;
-
-      doc.font("thai").fontSize(14).text(
-        `${i + 1}. ${item.label} - ${method} บาท`,
-        20
-      );
+      const calculated = item.qty * item.unitPrice;
+      const line = `${i + 1}. ${item.label} - ${item.qty} × ${item.unitPrice} = ${calculated.toLocaleString()} บาท`;
+      if (item.actualAmount != null) {
+        doc.font("thai").fontSize(14).text(`${line} - หัก: ${item.actualAmount.toLocaleString()} บาท`, 20);
+      } else {
+        doc.font("thai").fontSize(14).text(line, 20);
+      }
     });
 
     const deductTotal = bill.deductItems.reduce(
@@ -232,33 +227,26 @@ router.get("/:id/pdf", async (req, res) => {
       0
     );
 
-    // รายการหักเพิ่มเติม
+    const extraTotal = bill.extraDeductions.reduce((sum, item) => sum + item.amount, 0);
+    const netTotal = mainTotal - deductTotal - extraTotal;
+
+    // รายการหักเพิ่มเติม + ยอดสุทธิ
     doc.moveDown(0.4);
     doc.font("thai-bold").fontSize(15).text("รายการหักเพิ่มเติม:", 20);
     bill.extraDeductions.forEach((item, i) => {
-      doc.font("thai").fontSize(14).text(
-        `${i + 1}. ${item.label} - ${item.amount.toLocaleString()} บาท`,
-        20
-      );
+      doc.font("thai").fontSize(14).text(`${i + 1}. ${item.label} - ${item.amount.toLocaleString()} บาท`, 20);
     });
 
-    const extraTotal = bill.extraDeductions.reduce(
-      (sum, item) => sum + item.amount,
-      0
-    );
-
-    const netTotal = mainTotal - deductTotal - extraTotal;
-
-    // ยอดสุทธิชิดขวา
-    doc.moveDown(0.7);
-    doc.font("thai-bold").fontSize(18).text(
+    // ยอดสุทธิชิดขวาในบรรทัดเดียวกัน
+    doc.moveDown(0.3);
+    doc.font("thai-bold").fontSize(16).text(
       `ยอดสุทธิ: ${netTotal.toLocaleString()} บาท`,
       0,
       undefined,
       { align: "right", width: fullWidth }
     );
 
-    // SIGNATURE
+    // ลายเซ็น
     const sigY = doc.page.height - 60;
     doc.fontSize(11).text("...............................................", 40, sigY);
     doc.text("ผู้จ่ายเงิน", 40, sigY + 12);
