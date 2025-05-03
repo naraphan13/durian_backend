@@ -6,7 +6,100 @@ const PDFDocument = require("pdfkit");
 const fs = require("fs");
 const path = require("path");
 
-// ✅ Generate PDF for sell bill
+/ ✅ GET All sell bills
+router.get("/", async (req, res) => {
+  try {
+    const sells = await prisma.sellBill.findMany({
+      orderBy: { date: "desc" },
+      include: { items: true },
+    });
+    res.json(sells);
+  } catch (err) {
+    res.status(500).send("Error fetching sell bills");
+  }
+});
+
+// ✅ GET Single sell bill
+router.get("/:id", async (req, res) => {
+  try {
+    const sell = await prisma.sellBill.findUnique({
+      where: { id: parseInt(req.params.id) },
+      include: { items: true },
+    });
+    if (!sell) return res.status(404).send("Sell bill not found");
+    res.json(sell);
+  } catch (err) {
+    res.status(500).send("Error fetching bill");
+  }
+});
+
+// ✅ POST Create sell bill
+router.post("/", async (req, res) => {
+  const { customer, items } = req.body;
+
+  try {
+    const newSell = await prisma.sellBill.create({
+      data: {
+        customer,
+        items: {
+          create: items.map((i) => ({
+            variety: i.variety,
+            grade: i.grade,
+            weight: i.weight,
+            weights: i.weights || [],
+            pricePerKg: i.pricePerKg,
+          })),
+        },
+      },
+    });
+    res.json(newSell);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Error creating sell bill");
+  }
+});
+
+// ✅ PUT Update sell bill
+router.put("/:id", async (req, res) => {
+  const id = parseInt(req.params.id);
+  const { customer, items } = req.body;
+
+  try {
+    await prisma.sellItem.deleteMany({ where: { sellBillId: id } });
+    const updated = await prisma.sellBill.update({
+      where: { id },
+      data: {
+        customer,
+        items: {
+          create: items.map((i) => ({
+            variety: i.variety,
+            grade: i.grade,
+            weight: i.weight,
+            weights: i.weights || [],
+            pricePerKg: i.pricePerKg,
+          })),
+        },
+      },
+    });
+    res.json(updated);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Error updating sell bill");
+  }
+});
+
+// ✅ DELETE Sell bill
+router.delete("/:id", async (req, res) => {
+  try {
+    await prisma.sellItem.deleteMany({ where: { sellBillId: parseInt(req.params.id) } });
+    await prisma.sellBill.delete({ where: { id: parseInt(req.params.id) } });
+    res.sendStatus(204);
+  } catch (err) {
+    res.status(500).send("Error deleting sell bill");
+  }
+});
+
+// ✅ PDF
 router.get("/:id/pdf", async (req, res) => {
   try {
     const bill = await prisma.sellBill.findUnique({
@@ -16,26 +109,17 @@ router.get("/:id/pdf", async (req, res) => {
 
     if (!bill) return res.status(404).send("Bill not found");
 
-    const doc = new PDFDocument({
-      size: [396, 648], // A5 landscape
-      margin: 20,
-      layout: "landscape",
-    });
+    const doc = new PDFDocument({ size: [396, 648], margin: 20, layout: "landscape" });
 
-    // Font
     const fontPath = path.join(__dirname, "../fonts/THSarabunNew.ttf");
     const fontBoldPath = path.join(__dirname, "../fonts/THSarabunNewBold.ttf");
     if (fs.existsSync(fontPath)) doc.registerFont("thai", fontPath).font("thai");
     if (fs.existsSync(fontBoldPath)) doc.registerFont("thai-bold", fontBoldPath);
 
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader(
-      "Content-Disposition",
-      `inline; filename=receipt-sell-${bill.id}.pdf`
-    );
+    res.setHeader("Content-Disposition", `inline; filename=receipt-sell-${bill.id}.pdf`);
     doc.pipe(res);
 
-    // === Header ===
     const logoPath = path.join(__dirname, "../picture/S__5275654png (1).png");
     const logoSize = 70;
     const topY = 20;
@@ -53,31 +137,16 @@ router.get("/:id/pdf", async (req, res) => {
     doc.text("โทร: 081-078-2324 , 082-801-1225 , 095-905-5588", companyX, topY + 36);
 
     const date = new Date(bill.date);
-    const dateStr = new Intl.DateTimeFormat("th-TH", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      timeZone: "Asia/Bangkok",
-    }).format(date);
-    const timeStr = new Intl.DateTimeFormat("th-TH", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-      timeZone: "Asia/Bangkok",
-    }).format(date);
+    const dateStr = new Intl.DateTimeFormat("th-TH", { year: "numeric", month: "long", day: "numeric", timeZone: "Asia/Bangkok" }).format(date);
+    const timeStr = new Intl.DateTimeFormat("th-TH", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Bangkok" }).format(date);
 
     doc.font("thai").fontSize(13).text(`รหัสบิล: ${bill.id}    ลูกค้า: ${bill.customer}`, billInfoX, topY);
     doc.text("รายการขายทุเรียน", billInfoX, topY + 18);
     doc.text(`วันที่: ${dateStr} เวลา: ${timeStr} น.`, billInfoX, topY + 36);
 
-    // Title center
     doc.moveDown(0.5);
-    doc.font("thai-bold").fontSize(17).text("ใบเสร็จการขายทุเรียน", {
-      align: "center",
-      width: doc.page.width,
-    });
+    doc.font("thai-bold").fontSize(17).text("ใบเสร็จการขายทุเรียน", { align: "center", width: doc.page.width });
 
-    // === รายการ ===
     doc.moveDown(0.5);
     doc.font("thai-bold").fontSize(17).text("รายการที่ขาย:", 20);
 
@@ -95,11 +164,8 @@ router.get("/:id/pdf", async (req, res) => {
     });
 
     doc.moveDown(0.5);
-    doc.font("thai-bold").fontSize(17).text(`รวมเงิน: ${total.toLocaleString()} บาท`, {
-      align: "center",
-    });
+    doc.font("thai-bold").fontSize(17).text(`รวมเงิน: ${total.toLocaleString()} บาท`, { align: "center" });
 
-    // ลายเซ็น
     const sigY = doc.page.height - 60;
     doc.fontSize(11).text("...............................................", 40, sigY);
     doc.text("ผู้ขาย", 40, sigY + 12);
@@ -115,107 +181,5 @@ router.get("/:id/pdf", async (req, res) => {
     res.status(500).send("เกิดข้อผิดพลาด");
   }
 });
-
-
-
-
-
-
-router.post("/", async (req, res) => {
-    try {
-      const { seller, items } = req.body;
-      const newBill = await prisma.bill.create({
-        data: {
-          seller,
-          items: {
-            create: items.map((item) => ({
-              variety: item.variety,
-              grade: item.grade,
-              weights: item.weights,
-              weight: item.weight,
-              pricePerKg: item.pricePerKg,
-            })),
-          },
-        },
-        include: { items: true },
-      });
-      res.json(newBill);
-    } catch (err) {
-      console.error(err);
-      res.status(500).send("เกิดข้อผิดพลาดขณะสร้างบิลขาย");
-    }
-  });
-  
-  // 📌 แก้ไขบิลขาย
-  router.put("/:id", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const { seller, items } = req.body;
-  
-      await prisma.item.deleteMany({ where: { billId: id } });
-  
-      const updated = await prisma.bill.update({
-        where: { id },
-        data: {
-          seller,
-          items: {
-            create: items.map((item) => ({
-              variety: item.variety,
-              grade: item.grade,
-              weights: item.weights,
-              weight: item.weight,
-              pricePerKg: item.pricePerKg,
-            })),
-          },
-        },
-        include: { items: true },
-      });
-      res.json(updated);
-    } catch (err) {
-      console.error(err);
-      res.status(500).send("เกิดข้อผิดพลาดในการอัปเดต");
-    }
-  });
-  
-  // 📌 ลบบิลขาย
-  router.delete("/:id", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      await prisma.bill.delete({ where: { id } });
-      res.sendStatus(204);
-    } catch (err) {
-      console.error(err);
-      res.status(500).send("ลบไม่สำเร็จ");
-    }
-  });
-  
-  // 📌 ดึงบิลทั้งหมด
-  router.get("/", async (req, res) => {
-    try {
-      const bills = await prisma.bill.findMany({
-        orderBy: { date: "desc" },
-        include: { items: true },
-      });
-      res.json(bills);
-    } catch (err) {
-      console.error(err);
-      res.status(500).send("ไม่สามารถดึงข้อมูลบิลได้");
-    }
-  });
-  
-  // 📌 ดึงบิลรายตัว
-  router.get("/:id", async (req, res) => {
-    try {
-      const bill = await prisma.bill.findUnique({
-        where: { id: parseInt(req.params.id) },
-        include: { items: true },
-      });
-      if (!bill) return res.status(404).send("ไม่พบบิลนี้");
-      res.json(bill);
-    } catch (err) {
-      console.error(err);
-      res.status(500).send("ดึงข้อมูลบิลล้มเหลว");
-    }
-  });
 
 module.exports = router;

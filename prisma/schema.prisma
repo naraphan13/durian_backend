@@ -116,3 +116,29 @@ model ExtraDeduction {
   cuttingBillId Int
   cuttingBill   CuttingBill @relation(fields: [cuttingBillId], references: [id], onDelete: Cascade)
 }
+
+
+
+
+
+model SellBill {
+  id        Int         @id @default(autoincrement())
+  customer  String
+  date      DateTime    @default(now())
+  items     SellItem[]
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+}
+
+model SellItem {
+  id          Int      @id @default(autoincrement())
+  variety     String
+  grade       String
+  weight      Float
+  weights     Json?
+  pricePerKg  Float
+  sellBillId  Int
+  sellBill    SellBill @relation(fields: [sellBillId], references: [id], onDelete: Cascade)
+}
+
+
