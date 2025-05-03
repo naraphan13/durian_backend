@@ -6,7 +6,7 @@ const PDFDocument = require("pdfkit");
 const fs = require("fs");
 const path = require("path");
 
-/ ✅ GET All sell bills
+// ✅ GET All sell bills
 router.get("/", async (req, res) => {
   try {
     const sells = await prisma.sellBill.findMany({
