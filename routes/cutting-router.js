@@ -216,7 +216,7 @@ router.get("/:id/pdf", async (req, res) => {
       const calculated = item.qty * item.unitPrice;
       const line = `${i + 1}. ${item.label} - ${item.qty} × ${item.unitPrice} = ${calculated.toLocaleString()} บาท`;
       if (item.actualAmount != null) {
-        doc.font("thai").fontSize(14).text(`${line} - หัก: ${item.actualAmount.toLocaleString()} บาท`, 20);
+        doc.font("thai").fontSize(14).text(`${line} - กำหนดเอง: ${item.actualAmount.toLocaleString()} บาท`, 20);
       } else {
         doc.font("thai").fontSize(14).text(line, 20);
       }
@@ -230,19 +230,20 @@ router.get("/:id/pdf", async (req, res) => {
     const extraTotal = bill.extraDeductions.reduce((sum, item) => sum + item.amount, 0);
     const netTotal = mainTotal - deductTotal - extraTotal;
 
-    // รายการหักเพิ่มเติม + ยอดสุทธิ
+    // รายการหักเพิ่มเติม
     doc.moveDown(0.4);
     doc.font("thai-bold").fontSize(15).text("รายการหักเพิ่มเติม:", 20);
+    let lastY = doc.y;
     bill.extraDeductions.forEach((item, i) => {
       doc.font("thai").fontSize(14).text(`${i + 1}. ${item.label} - ${item.amount.toLocaleString()} บาท`, 20);
+      lastY = doc.y;
     });
 
-    // ยอดสุทธิชิดขวาในบรรทัดเดียวกัน
-    doc.moveDown(0.3);
+    // ยอดสุทธิอยู่บรรทัดเดียวกับรายการหักเพิ่มเติม
     doc.font("thai-bold").fontSize(16).text(
       `ยอดสุทธิ: ${netTotal.toLocaleString()} บาท`,
       0,
-      undefined,
+      lastY,
       { align: "right", width: fullWidth }
     );
 
