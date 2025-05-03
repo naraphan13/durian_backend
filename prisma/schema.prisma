@@ -52,7 +52,7 @@ model ExportContainer {
   handlingCosts Json // ข้อมูลค่าจัดการกล่อง
   boxCosts      Json // ข้อมูลค่ากล่อง
   inspectionFee Float
-  brandSummary  String?
+  brandSummary  String? @db.Text
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 }

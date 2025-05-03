@@ -7,20 +7,51 @@ const prisma = require('../models/prisma');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'secretkey';
 
-// ✅ POST /v1/auth/register
+
+
 router.post('/register', async (req, res) => {
-  const { email, password } = req.body;
+  const { name, email, password } = req.body;
+
   try {
-    const hashed = await bcrypt.hash(password, 10);
+    // ตรวจความถูกต้องเบื้องต้น
+    if (!email || !password || !name) {
+      return res.status(400).json({ error: 'กรุณากรอกข้อมูลให้ครบถ้วน' });
+    }
+
+    // แฮชรหัสผ่าน
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // สร้างผู้ใช้ใหม่ โดยบังคับ role = 'user'
     const user = await prisma.user.create({
-      data: { email, password: hashed },
+      data: {
+        name,
+        email,
+        password: hashedPassword,
+        role: 'user', // ✅ ป้องกันไม่ให้สร้าง admin จาก frontend
+      },
     });
-    res.json({ id: user.id, email: user.email });
+
+    res.status(201).json({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+    });
+
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Email อาจซ้ำหรือมีข้อผิดพลาด' });
+
+    // ตรวจ email ซ้ำ (Prisma error code P2002)
+    if (err.code === 'P2002' && err.meta?.target?.includes('email')) {
+      return res.status(409).json({ error: 'อีเมลนี้ถูกใช้งานแล้ว' });
+    }
+
+    res.status(500).json({ error: 'เกิดข้อผิดพลาดในการสมัคร' });
   }
 });
+
+module.exports = router;
+
 
 // ✅ POST /v1/auth/login
 router.post('/login', async (req, res) => {
@@ -33,7 +64,12 @@ router.post('/login', async (req, res) => {
     if (!match) return res.status(401).json({ error: 'รหัสผ่านไม่ถูกต้อง' });
 
     const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
-    res.json({ token });
+    res.json({
+      token,
+      user: {
+        role: user.role, // ✅ สำคัญ!
+      }
+    });;
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'เกิดข้อผิดพลาดในการเข้าสู่ระบบ' });
