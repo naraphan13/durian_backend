@@ -214,8 +214,8 @@ router.get("/:id/pdf", async (req, res) => {
     // ==== รายละเอียดค่าตัด ====
     const mainTotal = bill.mainWeight * bill.mainPrice;
     doc.moveDown(0.5);
-    doc.font("thai").fontSize(14).text(`วันที่ตัด: ${billDateStr}`, 20);
-    doc.text(
+    doc.font("thai-bold").fontSize(14).text(`วันที่ตัด: ${billDateStr}`, 20);
+    doc.font("thai-bold").text(
       `น้ำหนักรวม: ${bill.mainWeight} กก. × ${bill.mainPrice} บาท = ${mainTotal.toLocaleString()} บาท`,
       20
     );
@@ -227,9 +227,9 @@ router.get("/:id/pdf", async (req, res) => {
       const calculated = item.qty * item.unitPrice;
       const line = `${i + 1}. ${item.label} - ${item.qty} × ${item.unitPrice} = ${calculated.toLocaleString()} บาท`;
       if (item.actualAmount != null) {
-        doc.font("thai").fontSize(14).text(`${line} - หัก: ${item.actualAmount.toLocaleString()} บาท`, 20);
+        doc.font("thai-bold").fontSize(14).text(`${line} - หัก: ${item.actualAmount.toLocaleString()} บาท`, 20);
       } else {
-        doc.font("thai").fontSize(14).text(line, 20);
+        doc.font("thai-bold").fontSize(14).text(line, 20);
       }
     });
 
@@ -252,7 +252,7 @@ router.get("/:id/pdf", async (req, res) => {
     );
 
     bill.extraDeductions.forEach((item, i) => {
-      doc.font("thai").fontSize(14).text(`${i + 1}. ${item.label} - ${item.amount.toLocaleString()} บาท`, 20);
+      doc.font("thai-bold").fontSize(14).text(`${i + 1}. ${item.label} - ${item.amount.toLocaleString()} บาท`, 20);
     });
 
     // ==== ลายเซ็น ====
