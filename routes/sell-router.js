@@ -110,7 +110,7 @@ router.get("/:id/pdf", async (req, res) => {
     if (!bill) return res.status(404).send("Bill not found");
 
     const doc = new PDFDocument({ size: [396, 648], margin: 20, layout: "landscape" });
-
+    const fullWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
     const fontPath = path.join(__dirname, "../fonts/THSarabunNew.ttf");
     const fontBoldPath = path.join(__dirname, "../fonts/THSarabunNewBold.ttf");
     if (fs.existsSync(fontPath)) doc.registerFont("thai", fontPath).font("thai");
