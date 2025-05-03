@@ -203,6 +203,7 @@ router.get("/:id/pdf", async (req, res) => {
     );
 
     // รายการหัก. 
+    doc.moveDown(0.3);
     doc.font("thai-bold").fontSize(15).text("รายการหัก:", 20);
     bill.deductItems.forEach((item, i) => {
       const subtotal = item.qty * item.unitPrice;
@@ -218,7 +219,7 @@ router.get("/:id/pdf", async (req, res) => {
     );
 
     // รายการหักเพิ่มเติม
-    doc.moveDown(0.7);
+    doc.moveDown(0.4);
     doc.font("thai-bold").fontSize(15).text("รายการหักเพิ่มเติม:", 20);
     bill.extraDeductions.forEach((item, i) => {
       doc.font("thai-bold").fontSize(14).text(
