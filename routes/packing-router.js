@@ -5,104 +5,6 @@ const path = require('path');
 const prisma = require("../models/prisma");
 const router = express.Router();
 
-router.post('/pdf', async (req, res) => {
-  const data = req.body;
-  const doc = new PDFDocument({ size: [648, 396], margin: 40 }); // 9x5.5 นิ้ว
-
-  const buffers = [];
-  doc.on('data', buffers.push.bind(buffers));
-  doc.on('end', () => {
-    const pdfData = Buffer.concat(buffers);
-    res.writeHead(200, {
-      'Content-Type': 'application/pdf',
-      'Content-Disposition': `attachment; filename=packing-${data.date}.pdf`,
-      'Content-Length': pdfData.length,
-    });
-    res.end(pdfData);
-  });
-
-  const fontPath = path.join(__dirname, '../fonts/THSarabunNew.ttf');
-  const fontPathBold = path.join(__dirname, '../fonts/THSarabunNewBold.ttf');
-  if (fs.existsSync(fontPath)) doc.registerFont('thai', fontPath).font('thai');
-  if (fs.existsSync(fontPathBold)) doc.registerFont('thai-bold', fontPathBold);
-
-  const logoPath = path.join(__dirname, '../picture/S__5275654png (1).png');
-  if (fs.existsSync(logoPath)) {
-    doc.image(logoPath, 40, 30, { width: 60 });
-  }
-
-  doc.font('thai-bold').fontSize(16).text('ใบสรุปค่าแพ็คทุเรียน / Durian Packing Cost Summary', { align: 'center' });
-  doc.moveDown();
-  doc.fontSize(12).font('thai').text(`วันที่: ${data.date}`);
-  doc.moveDown();
-
-  const quantityBig = data.bigBox?.quantity || 0;
-  const priceBig = data.bigBox?.pricePerBox || 0;
-  const quantitySmall = data.smallBox?.quantity || 0;
-  const priceSmall = data.smallBox?.pricePerBox || 0;
-
-  const totalBig = quantityBig * priceBig;
-  const totalSmall = quantitySmall * priceSmall;
-  const total = totalBig + totalSmall;
-
-  doc.fontSize(13).font('thai-bold').text('รายละเอียดค่าแพ็ค:', { underline: true });
-  doc.font('thai-bold').text(`กล่องใหญ่: ${quantityBig} กล่อง × ${priceBig} บาท = ${totalBig.toLocaleString()} บาท`);
-  doc.font('thai-bold').text(`กล่องเล็ก: ${quantitySmall} กล่อง × ${priceSmall} บาท = ${totalSmall.toLocaleString()} บาท`);
-  doc.moveDown();
-
-  let totalDeduction = 0;
-  if (Array.isArray(data.deductions) && data.deductions.length > 0) {
-    doc.fontSize(13).font('thai-bold').text('รายละเอียดหักเบิก:', { underline: true });
-    data.deductions.forEach((d, idx) => {
-      const label = d.label || '-';
-      const amount = d.amount || 0;
-      totalDeduction += amount;
-      doc.font('thai-bold').text(`${idx + 1}. ${label}: ${amount.toLocaleString()} บาท`);
-    });
-    doc.moveDown();
-  }
-
-  const finalTotal = total - totalDeduction;
-
-  doc.font('thai-bold').text(`รวมทั้งหมด: ${total.toLocaleString()} บาท`, { continued: false });
-  if (totalDeduction > 0) {
-    doc.text(`หักเบิก: ${totalDeduction.toLocaleString()} บาท`, { continued: false });
-    doc.text(`คงเหลือหลังหัก: ${finalTotal.toLocaleString()} บาท`, { underline: true });
-  }
-
-  doc.moveDown(3);
-  doc.font('thai').text(
-    '......................................................                  ......................................................',
-    { align: 'center' }
-  );
-  doc.text(
-    'ผู้จ่ายเงิน / Paid By                                            ผู้รับเงิน / Received By',
-    { align: 'center' }
-  );
-
-  doc.end();
-});
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 // ✅ POST - บันทึกข้อมูลการแพ็ค
 router.post('/', async (req, res) => {
@@ -232,8 +134,9 @@ router.post("/:id/pdf", async (req, res) => {
     );
 
     // ข้อมูลบิล (ขวา)
+    const recipient = data.recipient || "__________";
     doc.font("thai").fontSize(13).text(
-      `รหัสบิล: ${data.id}    จ่ายให้: __________`,
+      `รหัสบิล: ${data.id}    จ่ายให้: ${recipient}`,
       billInfoX,
       topY
     );
@@ -312,33 +215,6 @@ router.post("/:id/pdf", async (req, res) => {
     res.status(500).json({ error: "เกิดข้อผิดพลาดในการสร้าง PDF", details: err });
   }
 });
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

@@ -60,6 +60,7 @@ model ExportContainer {
 model Packing {
   id               Int      @id @default(autoincrement())
   date             String
+  recipient        String?   // ✅ เพิ่มตรงนี้
   bigBoxQuantity   Int
   bigBoxPrice      Float
   smallBoxQuantity Int
@@ -72,6 +73,7 @@ model Packing {
 model ChemicalDip {
   id         Int      @id @default(autoincrement())
   date       String
+  recipient        String?   // ✅ เพิ่มตรงนี้
   weight     Float
   pricePerKg Float
   createdAt  DateTime @default(now())
@@ -81,6 +83,7 @@ model ChemicalDip {
 model ContainerLoading {
   id         Int      @id @default(autoincrement())
   date       String
+  recipient        String?   // ✅ เพิ่มตรงนี้
   containers Json // array ของ { label, containerCode, price }
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
