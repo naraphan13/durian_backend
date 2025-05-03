@@ -236,7 +236,7 @@ router.get("/:id/pdf", async (req, res) => {
     doc
       .font("thai")
       .fontSize(16)
-      .text("ใบสรุปค่าขึ้นตู้ทุเรียน Durian Container Loading Cost Summary", 30);
+      .text("ใบสรุปค่าขึ้นตู้ทุเรียน", 20);
 
     let total = 0;
     (data.containers || []).forEach((c, i) => {
