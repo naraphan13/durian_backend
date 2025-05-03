@@ -145,7 +145,7 @@ router.get("/:id/pdf", async (req, res) => {
     doc.text(`วันที่: ${dateStr} เวลา: ${timeStr} น.`, billInfoX, topY + 36);
 
     doc.moveDown(0.5);
-    doc.font("thai-bold").fontSize(17).text("ใบเสร็จการขายทุเรียน", { align: "center", width: doc.page.width });
+    doc.font("thai-bold").fontSize(17).text("ใบเสร็จการขายทุเรียน", { align: "center", width: fullWidth });
 
     doc.moveDown(0.5);
     doc.font("thai-bold").fontSize(17).text("รายการที่ขาย:", 20);
