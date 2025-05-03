@@ -208,8 +208,8 @@ router.get("/:id/pdf", async (req, res) => {
 
     // === รายการ ===
     doc.moveDown(1);
+    doc.font("thai").fontSize(16).text("ใบสรุปค่าขึ้นตู้ทุเรียน", 20);
     doc.font("thai-bold").fontSize(16).text("รายละเอียดค่าขึ้นตู้:", 20);
-    doc.font("thai").fontSize(16).text("ใบสรุปค่าขึ้นตู้ทุเรียน Durian Container Loading Cost Summary", 30);
 
     const containers = Array.isArray(data.containers) ? data.containers : [];
 
