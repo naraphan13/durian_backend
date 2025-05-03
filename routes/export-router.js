@@ -115,6 +115,7 @@ router.post('/', async (req, res) => {
     });
     res.json(newExport);
   } catch (err) {
+    console.error("❌ POST /v1/export error:", err);
     res.status(500).json({ error: 'เกิดข้อผิดพลาดในการบันทึก', details: err });
   }
 });
