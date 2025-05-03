@@ -13,57 +13,49 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-
 model User {
   id        Int      @id @default(autoincrement())
   email     String   @unique
   password  String
   role      String   @default("user")
-  name      String?  // ชื่อจริง (ไม่บังคับ)
+  name      String? // ชื่อจริง (ไม่บังคับ)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
-
 model Bill {
-  id        Int       @id @default(autoincrement())
-  date      DateTime  @default(now())
-  seller    String
-  items     Item[]
+  id     Int      @id @default(autoincrement())
+  date   DateTime @default(now())
+  seller String
+  items  Item[]
 }
 
 model Item {
-  id         Int     @id @default(autoincrement())
+  id         Int    @id @default(autoincrement())
   billId     Int
   variety    String
   grade      String
   weight     Float
-  weights    Json?        // ✅ ใส่ field ใหม่เพื่อเก็บน้ำหนักรายเข่ง
+  weights    Json? // ✅ ใส่ field ใหม่เพื่อเก็บน้ำหนักรายเข่ง
   pricePerKg Float
-  bill       Bill    @relation(fields: [billId], references: [id])
+  bill       Bill   @relation(fields: [billId], references: [id])
 }
-
-
-
-
 
 model ExportContainer {
-  id             Int      @id @default(autoincrement())
-  date           String
-  city           String
-  containerInfo  String
-  containerCode  String
-  refCode        String
-  durianItems    Json     // เก็บเป็น array ของรายการทุเรียน
-  handlingCosts  Json     // ข้อมูลค่าจัดการกล่อง
-  boxCosts       Json     // ข้อมูลค่ากล่อง
-  inspectionFee  Float
-  brandSummary   String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id            Int      @id @default(autoincrement())
+  date          String
+  city          String
+  containerInfo String
+  containerCode String
+  refCode       String
+  durianItems   Json // เก็บเป็น array ของรายการทุเรียน
+  handlingCosts Json // ข้อมูลค่าจัดการกล่อง
+  boxCosts      Json // ข้อมูลค่ากล่อง
+  inspectionFee Float
+  brandSummary  String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
-
-
 
 model Packing {
   id               Int      @id @default(autoincrement())
@@ -72,12 +64,10 @@ model Packing {
   bigBoxPrice      Float
   smallBoxQuantity Int
   smallBoxPrice    Float
-  deductions       Json      // Array ของรายการหักเบิก
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  deductions       Json // Array ของรายการหักเบิก
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 }
-
-
 
 model ChemicalDip {
   id         Int      @id @default(autoincrement())
@@ -88,48 +78,41 @@ model ChemicalDip {
   updatedAt  DateTime @updatedAt
 }
 
-
-
-
-
 model ContainerLoading {
   id         Int      @id @default(autoincrement())
   date       String
-  containers Json     // array ของ { label, containerCode, price }
+  containers Json // array ของ { label, containerCode, price }
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 }
 
-
-
 model CuttingBill {
-  id              Int                @id @default(autoincrement())
-  cutterName      String
-  startDate       DateTime
-  endDate         DateTime
-  mainWeight      Float
-  mainPrice       Float
-  paid            Boolean           @default(false)
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  id         Int      @id @default(autoincrement())
+  cutterName String
+  date       DateTime // ✅ แทน start-end
+  mainWeight Float
+  mainPrice  Float
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   deductItems     DeductItem[]
   extraDeductions ExtraDeduction[]
 }
 
 model DeductItem {
-  id             Int          @id @default(autoincrement())
-  label          String
-  qty            Float
-  unitPrice      Float
-  cuttingBillId  Int
-  cuttingBill    CuttingBill @relation(fields: [cuttingBillId], references: [id], onDelete: Cascade)
+  id            Int         @id @default(autoincrement())
+  label         String
+  qty           Float
+  unitPrice     Float
+  actualAmount  Float? // ✅ ใหม่: ถ้ามีจะใช้แทน qty * unitPrice
+  cuttingBillId Int
+  cuttingBill   CuttingBill @relation(fields: [cuttingBillId], references: [id], onDelete: Cascade)
 }
 
 model ExtraDeduction {
-  id             Int          @id @default(autoincrement())
-  label          String
-  amount         Float
-  cuttingBillId  Int
-  cuttingBill    CuttingBill @relation(fields: [cuttingBillId], references: [id], onDelete: Cascade)
+  id            Int         @id @default(autoincrement())
+  label         String
+  amount        Float
+  cuttingBillId Int
+  cuttingBill   CuttingBill @relation(fields: [cuttingBillId], references: [id], onDelete: Cascade)
 }

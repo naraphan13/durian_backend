@@ -6,32 +6,33 @@ const fs = require("fs");
 const path = require("path");
 
 
-// 📌 Create cutting bill
 router.post("/", async (req, res) => {
   const {
-    cutterName, startDate, endDate,
-    mainWeight, mainPrice, paid,
-    deductItems, extraDeductions
+    cutterName,
+    date,
+    mainWeight,
+    mainPrice,
+    deductItems,
+    extraDeductions,
   } = req.body;
 
   try {
     const bill = await prisma.cuttingBill.create({
       data: {
         cutterName,
-        startDate: new Date(startDate),
-        endDate: new Date(endDate),
+        date: new Date(date),
         mainWeight,
         mainPrice,
-        paid,
         deductItems: {
-          create: deductItems.map(d => ({
+          create: deductItems.map((d) => ({
             label: d.label,
             qty: d.qty,
             unitPrice: d.unitPrice,
+            actualAmount: d.actualAmount ?? null,
           })),
         },
         extraDeductions: {
-          create: extraDeductions.map(e => ({
+          create: extraDeductions.map((e) => ({
             label: e.label,
             amount: e.amount,
           })),
@@ -46,7 +47,7 @@ router.post("/", async (req, res) => {
   }
 });
 
-// 📌 Get all cutting bills
+// ✅ GET all cutting bills
 router.get("/", async (req, res) => {
   try {
     const bills = await prisma.cuttingBill.findMany({
@@ -60,7 +61,7 @@ router.get("/", async (req, res) => {
   }
 });
 
-// 📌 Get single bill
+// ✅ GET single bill
 router.get("/:id", async (req, res) => {
   try {
     const bill = await prisma.cuttingBill.findUnique({
@@ -74,13 +75,16 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-// 📌 Update bill
+// ✅ UPDATE cutting bill
 router.put("/:id", async (req, res) => {
   const id = parseInt(req.params.id);
   const {
-    cutterName, startDate, endDate,
-    mainWeight, mainPrice, paid,
-    deductItems, extraDeductions
+    cutterName,
+    date,
+    mainWeight,
+    mainPrice,
+    deductItems,
+    extraDeductions,
   } = req.body;
 
   try {
@@ -91,23 +95,34 @@ router.put("/:id", async (req, res) => {
       where: { id },
       data: {
         cutterName,
-        startDate: new Date(startDate),
-        endDate: new Date(endDate),
+        date: new Date(date),
         mainWeight,
         mainPrice,
-        paid,
-        deductItems: { create: deductItems },
-        extraDeductions: { create: extraDeductions },
+        deductItems: {
+          create: deductItems.map((d) => ({
+            label: d.label,
+            qty: d.qty,
+            unitPrice: d.unitPrice,
+            actualAmount: d.actualAmount ?? null,
+          })),
+        },
+        extraDeductions: {
+          create: extraDeductions.map((e) => ({
+            label: e.label,
+            amount: e.amount,
+          })),
+        },
       },
     });
 
     res.json(updated);
   } catch (error) {
+    console.error("Error updating bill:", error);
     res.status(500).send("Server error");
   }
 });
 
-// 📌 Delete bill
+// ✅ DELETE bill
 router.delete("/:id", async (req, res) => {
   try {
     await prisma.cuttingBill.delete({
@@ -181,40 +196,39 @@ router.get("/:id/pdf", async (req, res) => {
     doc.moveDown(0.5);
     doc.font("thai-bold").fontSize(17).text("ใบรายการค่าตัดทุเรียน", 0, undefined, centerOpts);
 
-    const startDateStr = new Date(bill.startDate).toLocaleDateString("th-TH", {
+    const billDateStr = new Date(bill.date).toLocaleDateString("th-TH", {
       day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
-    const endDateStr = new Date(bill.endDate).toLocaleDateString("th-TH", {
-      day: "numeric",
-      month: "short",
+      month: "long",
       year: "numeric",
     });
 
     const mainTotal = bill.mainWeight * bill.mainPrice;
 
     doc.moveDown(0.5);
-    doc.font("thai-bold").fontSize(14).text(`ช่วงวันที่: ${startDateStr} - ${endDateStr}`, 20, undefined);
-    doc.font("thai-bold").text(
+    doc.font("thai").fontSize(14).text(`วันที่: ${billDateStr}`, 20);
+    doc.font("thai").text(
       `น้ำหนักรวม: ${bill.mainWeight} กก. × ${bill.mainPrice} บาท = ${mainTotal.toLocaleString()} บาท`,
-      20,
-      undefined
+      20
     );
 
-    // รายการหัก. 
-    doc.moveDown(0.3);
+    // รายการหัก
+    doc.moveDown(0.4);
     doc.font("thai-bold").fontSize(15).text("รายการหัก:", 20);
+
     bill.deductItems.forEach((item, i) => {
-      const subtotal = item.qty * item.unitPrice;
-      doc.font("thai-bold").fontSize(14).text(
-        `${i + 1}. ${item.label} - ${item.qty} × ${item.unitPrice} = ${subtotal.toLocaleString()} บาท`,
+      const subtotal = item.actualAmount ?? item.qty * item.unitPrice;
+      const method = item.actualAmount != null
+        ? `กำหนดเอง: ${subtotal.toLocaleString()}`
+        : `${item.qty} × ${item.unitPrice} = ${subtotal.toLocaleString()}`;
+
+      doc.font("thai").fontSize(14).text(
+        `${i + 1}. ${item.label} - ${method} บาท`,
         20
       );
     });
 
     const deductTotal = bill.deductItems.reduce(
-      (sum, item) => sum + item.qty * item.unitPrice,
+      (sum, item) => sum + (item.actualAmount ?? item.qty * item.unitPrice),
       0
     );
 
@@ -222,7 +236,7 @@ router.get("/:id/pdf", async (req, res) => {
     doc.moveDown(0.4);
     doc.font("thai-bold").fontSize(15).text("รายการหักเพิ่มเติม:", 20);
     bill.extraDeductions.forEach((item, i) => {
-      doc.font("thai-bold").fontSize(14).text(
+      doc.font("thai").fontSize(14).text(
         `${i + 1}. ${item.label} - ${item.amount.toLocaleString()} บาท`,
         20
       );
@@ -235,7 +249,7 @@ router.get("/:id/pdf", async (req, res) => {
 
     const netTotal = mainTotal - deductTotal - extraTotal;
 
-    // ✅ ยอดสุทธิชิดขวา (กลางหน้า ไม่ล่างสุด)
+    // ยอดสุทธิชิดขวา
     doc.moveDown(0.7);
     doc.font("thai-bold").fontSize(18).text(
       `ยอดสุทธิ: ${netTotal.toLocaleString()} บาท`,
