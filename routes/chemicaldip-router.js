@@ -227,8 +227,8 @@ router.get("/:id/pdf", async (req, res) => {
 
     // === รายละเอียดค่าใช้จ่าย ===
     doc.moveDown(1);
+    doc.font("thai").fontSize(16).text("ใบสรุปค่าชุบน้ำยาทุเรียน Durian Chemical Dip Summary", 20);
     doc.font("thai-bold").fontSize(16).text("รายละเอียดค่าชุบน้ำยา:", 20);
-    doc.font("thai").fontSize(16).text("ใบสรุปค่าชุบน้ำยาทุเรียน Durian Chemical Dip Summary", 30);
 
     const total = data.weight * data.pricePerKg;
 
