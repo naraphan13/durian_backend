@@ -89,60 +89,60 @@ router.post("/", async (req, res) => {
 
 // 🔸 PUT แก้ไข
 router.put("/:id", async (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    const {
-      name,
-      date,
-      method,
-      payType,
-      period,
-      workDays,
-      pricePerDay,
-      monthlySalary,
-      months,
-      deductions = [],
-    } = req.body;
-
-    const totalPay = payType === "รายวัน"
-      ? Number(workDays) * Number(pricePerDay)
-      : Number(monthlySalary) * Number(months || 1);
-
-    const totalDeduct = (deductions || []).reduce((sum, d) => sum + Number(d.amount || 0), 0);
-    const netPay = totalPay - totalDeduct;
-
-    await prisma.deduction.deleteMany({ where: { payrollId: id } });
-
-    await prisma.payroll.update({
-      where: { id },
-      data: {
-        employeeName: name,
-        date: new Date(date),
+    try {
+      const id = Number(req.params.id);
+      const {
+        name,
+        date,
         method,
         payType,
         period,
-        workDays: workDays ? Number(workDays) : null,
-        pricePerDay: pricePerDay ? Number(pricePerDay) : null,
-        monthlySalary: monthlySalary ? Number(monthlySalary) : null,
-        months: months ? Number(months) : null,
-        totalPay,
-        totalDeduct,
-        netPay,
-        deductions: {
-          create: (deductions || []).map(d => ({
-            name: d.name,
-            amount: Number(d.amount),
-          })),
+        workDays,
+        pricePerDay,
+        monthlySalary,
+        months,
+        deductions = [],
+      } = req.body;
+  
+      const totalPay = payType === "รายวัน"
+        ? Number(workDays) * Number(pricePerDay)
+        : Number(monthlySalary) * Number(months || 1);
+  
+      const totalDeduct = (deductions || []).reduce((sum, d) => sum + Number(d.amount || 0), 0);
+      const netPay = totalPay - totalDeduct;
+  
+      await prisma.deduction.deleteMany({ where: { payrollId: id } });
+  
+      const updated = await prisma.payroll.update({
+        where: { id },
+        data: {
+          employeeName: name,
+          date: new Date(date),
+          method,
+          payType,
+          period,
+          workDays: workDays ? Number(workDays) : null,
+          pricePerDay: pricePerDay ? Number(pricePerDay) : null,
+          monthlySalary: monthlySalary ? Number(monthlySalary) : null,
+          months: months ? Number(months) : null,
+          totalPay,
+          totalDeduct,
+          netPay,
+          deductions: {
+            create: (deductions || []).map(d => ({
+              name: d.name,
+              amount: Number(d.amount),
+            })),
+          },
         },
-      },
-    });
-
-    
-  } catch (err) {
-    console.log('err', err)
-    res.status(500).json({ error: "แก้ไขไม่สำเร็จ" });
-  }
-});
+      });
+  
+      res.json({ success: true, id: updated.id });
+    } catch (err) {
+      console.log('err', err);
+      res.status(500).json({ error: "แก้ไขไม่สำเร็จ" });
+    }
+  });
 
 // 🔸 DELETE
 router.delete("/:id", async (req, res) => {
