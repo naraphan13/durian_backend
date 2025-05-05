@@ -157,7 +157,7 @@ router.get("/:id/pdf", async (req, res) => {
 
     doc.font("thai").fontSize(13).text(`รหัสบิล: ${bill.id}    จ่ายให้: ${bill.customer}`, billInfoX, topY);
     doc.font("thai").fontSize(13).text(`โดย: ___ เงินสด   ___ โอนผ่านบัญชีธนาคาร   เพื่อชำระ: ค่าทุเรียน`, billInfoX, topY + 18);
-    doc.font("thai").fontSize(13).text(`วันที่: ${dateStr} เวลา: ${timeStr} น.`, billInfoX, topY + 36);
+    doc.font("thai").fontSize(13).text(`วันที่: ${dateStr} `, billInfoX, topY + 36);
 
     // ===== หัวบิลกลางหน้า =====
     doc.moveDown(0.5);
@@ -190,15 +190,7 @@ router.get("/:id/pdf", async (req, res) => {
       width: fullWidth,
     });
 
-    // ===== ลายเซ็น =====
-    const sigY = doc.page.height - 60;
-    doc.fontSize(11).text("...............................................", 40, sigY);
-    doc.text("ผู้ขาย", 40, sigY + 12);
-    doc.text("ลงวันที่: ........../........../..........", 40, sigY + 24);
 
-    doc.text("...............................................", 340, sigY);
-    doc.text("ผู้รับเงิน", 340, sigY + 12);
-    doc.text("ลงวันที่: ........../........../..........", 340, sigY + 24);
 
     doc.end();
   } catch (err) {
