@@ -208,19 +208,21 @@ router.get("/:id/pdf", async (req, res) => {
     const companyX = logoX + logoSize + 15;
     const billInfoX = companyX + 250;
 
-    const date = new Date(bill.date);
+    // ✅ ปรับเวลา: เพิ่ม 7 ชั่วโมงให้ตรงกับ Asia/Bangkok
+    const utcDate = new Date(bill.date);
+    const bangkokDate = new Date(utcDate.getTime() + 7 * 60 * 60 * 1000);
+
     const dateStr = new Intl.DateTimeFormat("th-TH", {
       year: "numeric",
       month: "long",
       day: "numeric",
-      timeZone: "Asia/Bangkok",
-    }).format(date);
+    }).format(bangkokDate);
+
     const timeStr = new Intl.DateTimeFormat("th-TH", {
       hour: "2-digit",
       minute: "2-digit",
       hour12: false,
-      timeZone: "Asia/Bangkok",
-    }).format(date);
+    }).format(bangkokDate);
 
     // โลโก้ซ้ายสุด
     if (fs.existsSync(logoPath)) {
