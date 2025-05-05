@@ -36,59 +36,59 @@ router.get("/:id", async (req, res) => {
 
 // 🔸 POST สร้างใหม่
 router.post("/", async (req, res) => {
-  try {
-    const {
-      name,
-      date,
-      method,
-      payType,
-      period,
-      workDays,
-      pricePerDay,
-      monthlySalary,
-      months,
-      deductions = [],
-    } = req.body;
-
-    const totalPay = payType === "รายวัน"
-      ? Number(workDays) * Number(pricePerDay)
-      : Number(monthlySalary) * Number(months || 1);
-
-    const totalDeduct = (deductions || []).reduce((sum, d) => sum + Number(d.amount || 0), 0);
-    const netPay = totalPay - totalDeduct;
-
-    const payroll = await prisma.payroll.create({
-      data: {
-        employeeName: name,
-        date: new Date(date),
+    try {
+      const {
+        name,
+        date,
         method,
         payType,
         period,
-        workDays: workDays ? Number(workDays) : null,
-        pricePerDay: pricePerDay ? Number(pricePerDay) : null,
-        monthlySalary: monthlySalary ? Number(monthlySalary) : null,
-        months: months ? Number(months) : null,
-        totalPay,
-        totalDeduct,
-        netPay,
-        deductions: {
-          create: (deductions || []).map(d => ({
-            name: d.name,
-            amount: Number(d.amount),
-          })),
+        workDays,
+        pricePerDay,
+        monthlySalary,
+        months,
+        deductions = [],
+      } = req.body;
+  
+      const totalPay = payType === "รายวัน"
+        ? Number(workDays) * Number(pricePerDay)
+        : Number(monthlySalary) * Number(months || 1);
+  
+      const totalDeduct = (deductions || []).reduce((sum, d) => sum + Number(d.amount || 0), 0);
+      const netPay = totalPay - totalDeduct;
+  
+      const payroll = await prisma.payroll.create({
+        data: {
+          employeeName: name,
+          date: new Date(date),
+          method,
+          payType,
+          period,
+          workDays: workDays ? Number(workDays) : null,
+          pricePerDay: pricePerDay ? Number(pricePerDay) : null,
+          monthlySalary: monthlySalary ? Number(monthlySalary) : null,
+          months: months ? Number(months) : null,
+          totalPay,
+          totalDeduct,
+          netPay,
+          deductions: {
+            create: (deductions || []).map(d => ({
+              name: d.name,
+              amount: Number(d.amount),
+            })),
+          },
         },
-      },
-    });
-
-    
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "บันทึกไม่สำเร็จ" });
-  }
-});
-
-// 🔸 PUT แก้ไข
-router.put("/:id", async (req, res) => {
+      });
+  
+      res.json({ success: true, id: payroll.id });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: "บันทึกไม่สำเร็จ" });
+    }
+  });
+  
+  // 🔸 PUT แก้ไข
+  router.put("/:id", async (req, res) => {
     try {
       const id = Number(req.params.id);
       const {
