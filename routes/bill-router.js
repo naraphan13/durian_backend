@@ -210,7 +210,7 @@ router.get("/:id/pdf", async (req, res) => {
 
     // ✅ ปรับเวลา: เพิ่ม 7 ชั่วโมงให้ตรงกับ Asia/Bangkok
     const utcDate = new Date(bill.date);
-    const bangkokDate = new Date(utcDate.getTime() + 7 * 60 * 60 * 1000);
+    const bangkokDate = new Date(bill.date);
 
     const dateStr = new Intl.DateTimeFormat("th-TH", {
       year: "numeric",
