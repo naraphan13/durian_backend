@@ -180,7 +180,7 @@ async function generatePayrollPdf(res, id) {
     res.setHeader("Content-Disposition", `inline; filename=payroll-${id}.pdf`);
     doc.pipe(res);
 
-    doc.font("thai-bold").fontSize(20).text("บริษัท สุริยา388 จำกัด", { align: "center" });
+    doc.font("thai-bold").fontSize(19).text("บริษัท สุริยา388 จำกัด", { align: "center" });
     doc.font("thai").fontSize(14).text("203/2 ม.12 ต.บ้านนา อ.เมืองชุมพร จ.ชุมพร 86190", { align: "center" });
     doc.text("โทร: 081-078-2324 , 082-801-1225 , 095-905-5588", { align: "center" });
     doc.moveDown();
