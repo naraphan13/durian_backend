@@ -3,7 +3,7 @@ const express = require("express");
 const PDFDocument = require("pdfkit");
 const fs = require("fs");
 const path = require("path");
-const prisma = require("../prisma/client");
+const prisma = require("../models/prisma");
 
 const router = express.Router();
 
