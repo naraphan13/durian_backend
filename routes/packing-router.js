@@ -67,12 +67,11 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
-router.get("/:id/pdf", async (req, res) => {
+// ✅ POST - พิมพ์ PDF จากข้อมูลการแพ็ค
+router.post("/:id/pdf", async (req, res) => {
   try {
-    const id = parseInt(req.params.id);
-    const data = await prisma.payroll.findUnique({
-      where: { id },
-      include: { deductions: true },
+    const data = await prisma.packing.findUnique({
+      where: { id: parseInt(req.params.id) },
     });
 
     if (!data) return res.status(404).json({ error: "ไม่พบข้อมูล" });
@@ -84,14 +83,16 @@ router.get("/:id/pdf", async (req, res) => {
     });
 
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `inline; filename=payroll-${data.id}.pdf`);
+    res.setHeader("Content-Disposition", `inline; filename="packing-${data.id}.pdf"`);
     doc.pipe(res);
 
+    // โหลดฟอนต์
     const fontPath = path.join(__dirname, "../fonts/THSarabunNew.ttf");
     const fontBoldPath = path.join(__dirname, "../fonts/THSarabunNewBold.ttf");
     if (fs.existsSync(fontPath)) doc.registerFont("thai", fontPath).font("thai");
     if (fs.existsSync(fontBoldPath)) doc.registerFont("thai-bold", fontBoldPath);
 
+    // === HEADER ===
     const logoPath = path.join(__dirname, "../picture/S__5275654png (1).png");
     const logoSize = 70;
     const topY = 20;
@@ -107,7 +108,6 @@ router.get("/:id/pdf", async (req, res) => {
       day: "numeric",
       timeZone: "Asia/Bangkok",
     }).format(date);
-
     const timeStr = new Intl.DateTimeFormat("th-TH", {
       hour: "2-digit",
       minute: "2-digit",
@@ -115,10 +115,12 @@ router.get("/:id/pdf", async (req, res) => {
       timeZone: "Asia/Bangkok",
     }).format(date);
 
+    // โลโก้
     if (fs.existsSync(logoPath)) {
       doc.image(logoPath, logoX, logoY, { fit: [logoSize, logoSize] });
     }
 
+    // ข้อมูลบริษัท (ซ้าย)
     doc.font("thai").fontSize(13).text("บริษัท สุริยา388 จำกัด", companyX, topY);
     doc.font("thai").fontSize(13).text(
       "เลขที่ 203/2 ม.12 ต.บ้านนา อ.เมืองชุมพร จ.ชุมพร 86190",
@@ -131,13 +133,15 @@ router.get("/:id/pdf", async (req, res) => {
       topY + 36
     );
 
+    // ข้อมูลบิล (ขวา)
+    const recipient = data.recipient || "__________";
     doc.font("thai").fontSize(13).text(
-      `รหัสบิล: ${data.id}    จ่ายให้: ${data.employeeName}`,
+      `รหัสบิล: ${data.id}    จ่ายให้: ${recipient}`,
       billInfoX,
       topY
     );
     doc.font("thai").fontSize(13).text(
-      `โดย: ___ เงินสด   ___ โอนผ่านบัญชีธนาคาร   เพื่อชำระ: ค่าจ้างพนักงาน`,
+      `โดย: ___ เงินสด   ___ โอนผ่านบัญชีธนาคาร   เพื่อชำระ: ค่าบริการแพ็คทุเรียน`,
       billInfoX,
       topY + 18
     );
@@ -147,6 +151,7 @@ router.get("/:id/pdf", async (req, res) => {
       topY + 36
     );
 
+    // === TITLE CENTER ===
     doc.moveDown(0.5);
     doc.font("thai-bold").fontSize(17).text(
       "ใบสำคัญจ่าย PAYMENT VOUCHER",
@@ -155,40 +160,46 @@ router.get("/:id/pdf", async (req, res) => {
       { align: "center", width: doc.page.width }
     );
 
+    // === รายการค่าแพ็ค ===
     doc.moveDown(0.2);
-    doc.font("thai").fontSize(16).text("ใบสรุปเงินเดือนพนักงาน", 20);
-    doc.font("thai-bold").fontSize(16).text("รายละเอียดค่าจ้าง:", 20);
+    doc.font("thai").fontSize(16).text("ใบสรุปค่าแพ็คทุเรียน", 20);
+    doc.font("thai-bold").fontSize(16).text("รายละเอียดค่าแพ็ค:", 20);
 
-    if (data.payType === "รายวัน") {
-      doc.font("thai").fontSize(16).text(
-        `รายวัน: ${data.workDays} วัน × ${data.pricePerDay} บาท = ${data.totalPay.toLocaleString()} บาท`,
-        20
-      );
-    } else {
-      doc.font("thai").fontSize(16).text(
-        `รายเดือน: ${data.monthlySalary} บาท × ${data.months} เดือน = ${data.totalPay.toLocaleString()} บาท`,
-        20
-      );
-    }
+    const totalBig = data.bigBoxQuantity * data.bigBoxPrice;
+    const totalSmall = data.smallBoxQuantity * data.smallBoxPrice;
+    const total = totalBig + totalSmall;
 
+    doc.font("thai-bold").fontSize(16).text(
+      `กล่องใหญ่: ${data.bigBoxQuantity} กล่อง × ${data.bigBoxPrice} บาท = ${totalBig.toLocaleString()} บาท`,
+      20
+    );
+    doc.font("thai-bold").fontSize(16).text(
+      `กล่องเล็ก: ${data.smallBoxQuantity} กล่อง × ${data.smallBoxPrice} บาท = ${totalSmall.toLocaleString()} บาท`,
+      20
+    );
+
+    // === หักเบิก ===
     let totalDeduction = 0;
-    if (Array.isArray(data.deductions) && data.deductions.length > 0) {
+    const deductions = data.deductions || [];
+
+    if (Array.isArray(deductions) && deductions.length > 0) {
       doc.moveDown(0.2);
       doc.font("thai-bold").fontSize(16).text("รายละเอียดรายการหัก:", 20);
-      data.deductions.forEach((d, idx) => {
+      deductions.forEach((d, idx) => {
         totalDeduction += d.amount || 0;
-        doc.font("thai").fontSize(16).text(`${idx + 1}. ${d.name || "-"}: ${d.amount.toLocaleString()} บาท`, 30);
+        doc.font("thai").fontSize(16).text(`${idx + 1}. ${d.label || "-"}: ${d.amount.toLocaleString()} บาท`, 30);
       });
     }
 
-    const finalTotal = data.totalPay - totalDeduction;
-    doc.moveDown(0.3);
-    doc.font("thai-bold").fontSize(16).text(`รวมทั้งหมด: ${data.totalPay.toLocaleString()} บาท`, 20);
+    const finalTotal = total - totalDeduction;
+    doc.moveDown(0.2);
+    doc.font("thai-bold").fontSize(16).text(`รวมทั้งหมด: ${total.toLocaleString()} บาท`, 20);
     if (totalDeduction > 0) {
       doc.font("thai-bold").fontSize(16).text(`หักเบิก: ${totalDeduction.toLocaleString()} บาท`, 20);
       doc.font("thai-bold").fontSize(16).text(`คงเหลือหลังหัก: ${finalTotal.toLocaleString()} บาท`, 20);
     }
 
+    // === ลายเซ็น ===
     const signatureBaseY = doc.page.height - 60;
     doc.fontSize(11).text("...............................................", 40, signatureBaseY);
     doc.fontSize(11).text("ผู้จ่ายเงิน", 40, signatureBaseY + 12);
