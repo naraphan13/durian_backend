@@ -7,19 +7,20 @@ const fs = require('fs');
 const path = require("path");
 
 
-// ✅ POST /v1/bills - บันทึกบิลใหม่
+// ✅ POST /v1/bills - บันทึกบิลใหม่ (ใส่วันที่เองได้)
 router.post("/", async (req, res) => {
-  const { seller, items } = req.body;
+  const { seller, date, items } = req.body;
   try {
     const bill = await prisma.bill.create({
       data: {
         seller,
+        date: new Date(date), // ✅ ใช้วันที่จาก frontend
         items: {
           create: items.map((item) => ({
             variety: item.variety,
             grade: item.grade,
             weight: parseFloat(item.weight),
-            weights: item.weights || [], // ✅ เก็บ array รายเข่ง
+            weights: item.weights || [],
             pricePerKg: parseFloat(item.pricePerKg),
           })),
         },
@@ -32,6 +33,7 @@ router.post("/", async (req, res) => {
     res.status(500).json({ error: "Failed to create bill" });
   }
 });
+
 
 // ✅ GET /v1/bills - ดูบิลทั้งหมด
 router.get("/", async (req, res) => {
