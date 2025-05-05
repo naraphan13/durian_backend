@@ -80,8 +80,7 @@ router.post("/", async (req, res) => {
       },
     });
 
-    // ✅ PDF ตอบกลับทันที
-    generatePayrollPdf(res, payroll.id);
+    
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "บันทึกไม่สำเร็จ" });
@@ -138,7 +137,7 @@ router.put("/:id", async (req, res) => {
       },
     });
 
-    generatePayrollPdf(res, id);
+    
   } catch (err) {
     console.log('err', err)
     res.status(500).json({ error: "แก้ไขไม่สำเร็จ" });
