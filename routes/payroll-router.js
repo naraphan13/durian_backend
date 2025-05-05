@@ -272,7 +272,7 @@ router.get("/:id/pdf", async (req, res) => {
       }
   
       const finalTotal = data.totalPay - totalDeduction;
-      doc.moveDown(0.2);
+      doc.moveDown(0.3);
       doc.font("thai-bold").fontSize(16).text(`รวมทั้งหมด: ${data.totalPay.toLocaleString()} บาท`, 20);
       if (totalDeduction > 0) {
         doc.font("thai-bold").fontSize(16).text(`หักเบิก: ${totalDeduction.toLocaleString()} บาท`, 20);
