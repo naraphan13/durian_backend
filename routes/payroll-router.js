@@ -245,7 +245,7 @@ router.get("/:id/pdf", async (req, res) => {
         { align: "center", width: doc.page.width }
       );
   
-      doc.moveDown(0.2);
+      doc.moveDown(0.3);
       doc.font("thai").fontSize(16).text("ใบสรุปเงินเดือนพนักงาน", 20);
       doc.font("thai-bold").fontSize(16).text("รายละเอียดค่าจ้าง:", 20);
   
