@@ -3,11 +3,38 @@ const express = require("express");
 const PDFDocument = require("pdfkit");
 const fs = require("fs");
 const path = require("path");
-const prisma = require("../models/prisma"); // ปรับ path ตามจริง
+const prisma = require("../prisma/client");
 
 const router = express.Router();
 
-// 🟢 CREATE
+// 🔸 GET รายการทั้งหมด
+router.get("/", async (req, res) => {
+  try {
+    const data = await prisma.payroll.findMany({
+      include: { deductions: true },
+      orderBy: { date: "desc" },
+    });
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: "โหลดข้อมูลไม่สำเร็จ" });
+  }
+});
+
+// 🔸 GET รายการเดียว
+router.get("/:id", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const data = await prisma.payroll.findUnique({
+      where: { id },
+      include: { deductions: true },
+    });
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: "โหลดข้อมูลไม่สำเร็จ" });
+  }
+});
+
+// 🔸 POST สร้างใหม่
 router.post("/", async (req, res) => {
   try {
     const {
@@ -23,14 +50,11 @@ router.post("/", async (req, res) => {
       deductions = [],
     } = req.body;
 
-    let totalPay = 0;
-    if (payType === "รายวัน") {
-      totalPay = Number(workDays) * Number(pricePerDay);
-    } else if (payType === "รายเดือน") {
-      totalPay = Number(monthlySalary) * Number(months || 1);
-    }
+    const totalPay = payType === "รายวัน"
+      ? Number(workDays) * Number(pricePerDay)
+      : Number(monthlySalary) * Number(months || 1);
 
-    const totalDeduct = deductions.reduce((sum, d) => sum + Number(d.amount || 0), 0);
+    const totalDeduct = (deductions || []).reduce((sum, d) => sum + Number(d.amount || 0), 0);
     const netPay = totalPay - totalDeduct;
 
     const payroll = await prisma.payroll.create({
@@ -48,32 +72,23 @@ router.post("/", async (req, res) => {
         totalDeduct,
         netPay,
         deductions: {
-          create: deductions.map((d) => ({ name: d.name, amount: Number(d.amount) })),
+          create: (deductions || []).map(d => ({
+            name: d.name,
+            amount: Number(d.amount),
+          })),
         },
       },
     });
 
-    res.json(payroll);
+    // ✅ PDF ตอบกลับทันที
+    generatePayrollPdf(res, payroll.id);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "สร้างข้อมูลไม่สำเร็จ" });
+    res.status(500).json({ error: "บันทึกไม่สำเร็จ" });
   }
 });
 
-// 🔵 READ ทั้งหมด
-router.get("/", async (req, res) => {
-  try {
-    const data = await prisma.payroll.findMany({
-      include: { deductions: true },
-      orderBy: { date: "desc" },
-    });
-    res.json(data);
-  } catch (err) {
-    res.status(500).json({ error: "ไม่สามารถดึงข้อมูลได้" });
-  }
-});
-
-// 🟠 UPDATE
+// 🔸 PUT แก้ไข
 router.put("/:id", async (req, res) => {
   try {
     const id = Number(req.params.id);
@@ -90,18 +105,16 @@ router.put("/:id", async (req, res) => {
       deductions = [],
     } = req.body;
 
-    let totalPay = 0;
-    if (payType === "รายวัน") {
-      totalPay = Number(workDays) * Number(pricePerDay);
-    } else {
-      totalPay = Number(monthlySalary) * Number(months || 1);
-    }
-    const totalDeduct = deductions.reduce((sum, d) => sum + Number(d.amount || 0), 0);
+    const totalPay = payType === "รายวัน"
+      ? Number(workDays) * Number(pricePerDay)
+      : Number(monthlySalary) * Number(months || 1);
+
+    const totalDeduct = (deductions || []).reduce((sum, d) => sum + Number(d.amount || 0), 0);
     const netPay = totalPay - totalDeduct;
 
     await prisma.deduction.deleteMany({ where: { payrollId: id } });
 
-    const updated = await prisma.payroll.update({
+    await prisma.payroll.update({
       where: { id },
       data: {
         employeeName: name,
@@ -117,40 +130,45 @@ router.put("/:id", async (req, res) => {
         totalDeduct,
         netPay,
         deductions: {
-          create: deductions.map((d) => ({ name: d.name, amount: Number(d.amount) })),
+          create: (deductions || []).map(d => ({
+            name: d.name,
+            amount: Number(d.amount),
+          })),
         },
       },
     });
 
-    res.json(updated);
+    generatePayrollPdf(res, id);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "แก้ไขข้อมูลไม่สำเร็จ" });
+    res.status(500).json({ error: "แก้ไขไม่สำเร็จ" });
   }
 });
 
-// 🔴 DELETE
+// 🔸 DELETE
 router.delete("/:id", async (req, res) => {
   try {
     const id = Number(req.params.id);
     await prisma.deduction.deleteMany({ where: { payrollId: id } });
     await prisma.payroll.delete({ where: { id } });
-    res.json({ message: "ลบข้อมูลสำเร็จ" });
+    res.json({ message: "ลบสำเร็จ" });
   } catch (err) {
     res.status(500).json({ error: "ลบไม่สำเร็จ" });
   }
 });
 
-// 🖨 PRINT PDF
+// 🔸 GET PDF
 router.get("/:id/pdf", async (req, res) => {
+  const id = Number(req.params.id);
+  generatePayrollPdf(res, id);
+});
+
+// 🔸 ฟังก์ชันสร้าง PDF
+async function generatePayrollPdf(res, id) {
   try {
-    const id = Number(req.params.id);
     const data = await prisma.payroll.findUnique({
       where: { id },
       include: { deductions: true },
     });
-
-    if (!data) return res.status(404).send("ไม่พบข้อมูลพนักงาน");
 
     const doc = new PDFDocument({ size: "A4", margin: 40 });
     const fontPath = path.join(__dirname, "../fonts/THSarabunNew.ttf");
@@ -192,8 +210,7 @@ router.get("/:id/pdf", async (req, res) => {
 
     doc.moveDown();
     doc.font("thai-bold").text(`คงเหลือสุทธิ: ${data.netPay.toLocaleString()} บาท`, { align: "right" });
-
-    doc.moveDown(1.9);
+    doc.moveDown(2);
     doc.text("ลงชื่อ....................................................... (ผู้จ่ายเงิน)", 70);
     doc.text("ลงชื่อ....................................................... (ผู้รับเงิน)", 350);
     doc.moveDown();
@@ -202,8 +219,8 @@ router.get("/:id/pdf", async (req, res) => {
 
     doc.end();
   } catch (err) {
-    res.status(500).send("เกิดข้อผิดพลาดในการสร้าง PDF");
+    res.status(500).send("ไม่สามารถสร้าง PDF ได้");
   }
-});
+}
 
 module.exports = router;
