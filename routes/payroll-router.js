@@ -193,7 +193,7 @@ router.get("/:id/pdf", async (req, res) => {
     doc.moveDown();
     doc.font("thai-bold").text(`คงเหลือสุทธิ: ${data.netPay.toLocaleString()} บาท`, { align: "right" });
 
-    doc.moveDown(2);
+    doc.moveDown(1.9);
     doc.text("ลงชื่อ....................................................... (ผู้จ่ายเงิน)", 70);
     doc.text("ลงชื่อ....................................................... (ผู้รับเงิน)", 350);
     doc.moveDown();
