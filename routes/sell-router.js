@@ -155,7 +155,7 @@ router.get("/:id/pdf", async (req, res) => {
       timeZone: "Asia/Bangkok",
     }).format(date);
 
-    doc.font("thai").fontSize(13).text(`รหัสบิล: ${bill.id}    จ่ายให้: ${bill.customer}`, billInfoX, topY);
+    doc.font("thai").fontSize(13).text(`รหัสบิล: ${bill.id}    ขายให้: ${bill.customer}`, billInfoX, topY);
     doc.font("thai").fontSize(13).text(`โดย: ___ เงินสด   ___ โอนผ่านบัญชีธนาคาร   เพื่อชำระ: ค่าทุเรียน`, billInfoX, topY + 18);
     doc.font("thai").fontSize(13).text(`วันที่: ${dateStr} `, billInfoX, topY + 36);
 
