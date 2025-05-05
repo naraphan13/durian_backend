@@ -146,3 +146,39 @@ model SellItem {
 }
 
 
+
+
+
+
+model Payroll {
+  id           Int           @id @default(autoincrement())
+  employeeName String
+  date         DateTime
+  period       String
+  payType      String       // "รายวัน" หรือ "รายเดือน"
+  method       String       // "เงินสด" หรือ "โอนผ่านบัญชีธนาคาร"
+  workDays     Int?         // สำหรับรายวัน
+  pricePerDay  Float?       // สำหรับรายวัน
+  monthlySalary Float?      // สำหรับรายเดือน
+  months       Int?         // จำนวนเดือนที่จ่าย (รายเดือน)
+  totalPay     Float
+  totalDeduct  Float
+  netPay       Float
+
+  deductions   Deduction[]  @relation("PayrollDeductions")
+
+  createdAt    DateTime     @default(now())
+}
+
+model Deduction {
+  id        Int      @id @default(autoincrement())
+  name      String
+  amount    Float
+
+  payrollId Int
+  payroll   Payroll  @relation("PayrollDeductions", fields: [payrollId], references: [id])
+
+  createdAt DateTime @default(now())
+}
+
+
