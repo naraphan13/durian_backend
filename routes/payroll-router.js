@@ -34,15 +34,12 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-// 🔸 POST สร้างใหม่
 router.post("/", async (req, res) => {
     try {
       const {
         name,
         date,
-        method,
         payType,
-        period,
         workDays,
         pricePerDay,
         monthlySalary,
@@ -51,30 +48,28 @@ router.post("/", async (req, res) => {
       } = req.body;
   
       const totalPay = payType === "รายวัน"
-        ? Number(workDays) * Number(pricePerDay)
-        : Number(monthlySalary) * Number(months || 1);
+        ? parseFloat(workDays) * parseFloat(pricePerDay)
+        : parseFloat(monthlySalary) * parseFloat(months || 1);
   
-      const totalDeduct = (deductions || []).reduce((sum, d) => sum + Number(d.amount || 0), 0);
+      const totalDeduct = deductions.reduce((sum, d) => sum + parseFloat(d.amount || 0), 0);
       const netPay = totalPay - totalDeduct;
   
       const payroll = await prisma.payroll.create({
         data: {
           employeeName: name,
           date: new Date(date),
-          method,
           payType,
-          period,
-          workDays: workDays ? Number(workDays) : null,
-          pricePerDay: pricePerDay ? Number(pricePerDay) : null,
-          monthlySalary: monthlySalary ? Number(monthlySalary) : null,
-          months: months ? Number(months) : null,
+          workDays: workDays ? parseFloat(workDays) : null,
+          pricePerDay: pricePerDay ? parseFloat(pricePerDay) : null,
+          monthlySalary: monthlySalary ? parseFloat(monthlySalary) : null,
+          months: months ? parseFloat(months) : null,
           totalPay,
           totalDeduct,
           netPay,
           deductions: {
-            create: (deductions || []).map(d => ({
+            create: deductions.map(d => ({
               name: d.name,
-              amount: Number(d.amount),
+              amount: parseFloat(d.amount),
             })),
           },
         },
@@ -87,16 +82,14 @@ router.post("/", async (req, res) => {
     }
   });
   
-  // 🔸 PUT แก้ไข
+  
   router.put("/:id", async (req, res) => {
     try {
       const id = Number(req.params.id);
       const {
         name,
         date,
-        method,
         payType,
-        period,
         workDays,
         pricePerDay,
         monthlySalary,
@@ -105,10 +98,10 @@ router.post("/", async (req, res) => {
       } = req.body;
   
       const totalPay = payType === "รายวัน"
-        ? Number(workDays) * Number(pricePerDay)
-        : Number(monthlySalary) * Number(months || 1);
+        ? parseFloat(workDays) * parseFloat(pricePerDay)
+        : parseFloat(monthlySalary) * parseFloat(months || 1);
   
-      const totalDeduct = (deductions || []).reduce((sum, d) => sum + Number(d.amount || 0), 0);
+      const totalDeduct = deductions.reduce((sum, d) => sum + parseFloat(d.amount || 0), 0);
       const netPay = totalPay - totalDeduct;
   
       await prisma.deduction.deleteMany({ where: { payrollId: id } });
@@ -118,20 +111,18 @@ router.post("/", async (req, res) => {
         data: {
           employeeName: name,
           date: new Date(date),
-          method,
           payType,
-          period,
-          workDays: workDays ? Number(workDays) : null,
-          pricePerDay: pricePerDay ? Number(pricePerDay) : null,
-          monthlySalary: monthlySalary ? Number(monthlySalary) : null,
-          months: months ? Number(months) : null,
+          workDays: workDays ? parseFloat(workDays) : null,
+          pricePerDay: pricePerDay ? parseFloat(pricePerDay) : null,
+          monthlySalary: monthlySalary ? parseFloat(monthlySalary) : null,
+          months: months ? parseFloat(months) : null,
           totalPay,
           totalDeduct,
           netPay,
           deductions: {
-            create: (deductions || []).map(d => ({
+            create: deductions.map(d => ({
               name: d.name,
-              amount: Number(d.amount),
+              amount: parseFloat(d.amount),
             })),
           },
         },
@@ -139,10 +130,11 @@ router.post("/", async (req, res) => {
   
       res.json({ success: true, id: updated.id });
     } catch (err) {
-      console.log('err', err);
+      console.log("err", err);
       res.status(500).json({ error: "แก้ไขไม่สำเร็จ" });
     }
   });
+  
 
 // 🔸 DELETE
 router.delete("/:id", async (req, res) => {

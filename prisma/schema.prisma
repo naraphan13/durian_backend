@@ -154,13 +154,11 @@ model Payroll {
   id           Int           @id @default(autoincrement())
   employeeName String
   date         DateTime
-  period       String
   payType      String       // "รายวัน" หรือ "รายเดือน"
-  method       String       // "เงินสด" หรือ "โอนผ่านบัญชีธนาคาร"
-  workDays     Int?         // สำหรับรายวัน
+  workDays     Float?         // สำหรับรายวัน
   pricePerDay  Float?       // สำหรับรายวัน
   monthlySalary Float?      // สำหรับรายเดือน
-  months       Int?         // จำนวนเดือนที่จ่าย (รายเดือน)
+  months       Float?         // จำนวนเดือนที่จ่าย (รายเดือน)
   totalPay     Float
   totalDeduct  Float
   netPay       Float
