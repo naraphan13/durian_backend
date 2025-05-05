@@ -3,6 +3,7 @@ const PDFDocument = require('pdfkit');
 const fs = require('fs');
 const path = require('path');
 const prisma = require("../models/prisma");
+const { log } = require('console');
 const router = express.Router();
 
 
@@ -51,6 +52,7 @@ router.put('/:id', async (req, res) => {
     });
     res.json(updated);
   } catch (err) {
+    console.log('err', err)
     res.status(500).json({ error: 'ไม่สามารถอัปเดตได้', details: err });
   }
 });
