@@ -252,7 +252,7 @@ router.get("/:id/pdf", async (req, res) => {
     doc.font("thai").fontSize(13).text(`วันที่: ${dateStr} เวลา: ${timeStr} น.`, billInfoX, topY + 36);
 
     // ใบสำคัญจ่าย (หัวกลางหน้า)
-    doc.moveDown(0.5);
+    doc.moveDown(0.4);
     doc.font("thai-bold").fontSize(17).text(
       "ใบสำคัญจ่าย PAYMENT VOUCHER",
       0,
