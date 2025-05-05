@@ -34,12 +34,12 @@ app.use('/v1/chemicaldip', chemicalDipRouter);
 app.use('/v1/containerloading', containerLoadingRouter);
 app.use("/v1/cuttingbills", cuttingRoute);
 app.use("/v1/sellbills", sellRoute);
-app.use("/v1/payroll", sellRoute);
+app.use("/v1/payroll", payrollRoute);
 
 
 
 app.use(notFound);
 app.use(errorMiddleware);
 
-const port = process.env.PORT || 9998;
+const port = process.env.PORT || 9999;
 app.listen(port, () => console.log(`✅ Server running on port ${port}`));
