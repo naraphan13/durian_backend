@@ -140,6 +140,7 @@ router.put("/:id", async (req, res) => {
 
     generatePayrollPdf(res, id);
   } catch (err) {
+    console.log('err', err)
     res.status(500).json({ error: "แก้ไขไม่สำเร็จ" });
   }
 });
