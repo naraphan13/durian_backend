@@ -125,7 +125,7 @@ router.get("/:id/pdf", async (req, res) => {
     const recipient = data.recipient || "__________";
     doc.font("thai").fontSize(13).text(`รหัสบิล: ${data.id}    จ่ายให้: ${recipient}`, billInfoX, topY);
     doc.font("thai").fontSize(13).text(`โดย: ___ เงินสด   ___ โอนผ่านบัญชีธนาคาร   เพื่อชำระ: ค่าชุบน้ำยาทุเรียน`, billInfoX, topY + 18);
-    doc.font("thai").fontSize(13).text(`วันที่: ${dateStr} เวลา: ${timeStr} น.`, billInfoX, topY + 36);
+    doc.font("thai").fontSize(13).text(`วันที่: ${dateStr} `, billInfoX, topY + 36);
 
     // === TITLE CENTER ===
     doc.moveDown(0.5);

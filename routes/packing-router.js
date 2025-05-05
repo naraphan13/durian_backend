@@ -146,7 +146,7 @@ router.post("/:id/pdf", async (req, res) => {
       topY + 18
     );
     doc.font("thai").fontSize(13).text(
-      `วันที่: ${dateStr} เวลา: ${timeStr} น.`,
+      `วันที่: ${dateStr} `,
       billInfoX,
       topY + 36
     );

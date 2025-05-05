@@ -136,7 +136,7 @@ router.get("/:id/pdf", async (req, res) => {
       topY
     );
     doc.font("thai").fontSize(13).text(`โดย: ___ เงินสด   ___ โอนผ่านบัญชีธนาคาร   เพื่อชำระ: ค่าขึ้นตู้ทุเรียน`, billInfoX, topY + 18);
-    doc.font("thai").fontSize(13).text(`วันที่: ${dateStr} เวลา: ${timeStr} น.`, billInfoX, topY + 36);
+    doc.font("thai").fontSize(13).text(`วันที่: ${dateStr} `, billInfoX, topY + 36);
 
     const fullWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
     doc.moveDown(0.5);
