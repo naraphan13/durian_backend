@@ -33,14 +33,14 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-// ✅ POST Create sell bill
 router.post("/", async (req, res) => {
-  const { customer, items } = req.body;
+  const { customer, date, items } = req.body;
 
   try {
     const newSell = await prisma.sellBill.create({
       data: {
         customer,
+        date: new Date(date), // ✅ ใส่วันที่ที่ผู้ใช้กรอก
         items: {
           create: items.map((i) => ({
             variety: i.variety,
@@ -59,17 +59,18 @@ router.post("/", async (req, res) => {
   }
 });
 
-// ✅ PUT Update sell bill
 router.put("/:id", async (req, res) => {
   const id = parseInt(req.params.id);
-  const { customer, items } = req.body;
+  const { customer, date, items } = req.body; // ✅ เพิ่ม date
 
   try {
     await prisma.sellItem.deleteMany({ where: { sellBillId: id } });
+
     const updated = await prisma.sellBill.update({
       where: { id },
       data: {
         customer,
+        date: new Date(date), // ✅ รองรับการแก้วันที่
         items: {
           create: items.map((i) => ({
             variety: i.variety,
@@ -81,6 +82,7 @@ router.put("/:id", async (req, res) => {
         },
       },
     });
+
     res.json(updated);
   } catch (err) {
     console.error(err);

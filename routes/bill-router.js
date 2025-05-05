@@ -127,34 +127,34 @@ router.delete("/:id", async (req, res) => {
 
 
 
+// ✅ PUT Update bill
 router.put("/:id", async (req, res) => {
-  const { seller, items } = req.body;
+  const id = parseInt(req.params.id);
+  const { seller, date, items } = req.body;
+
   try {
-    const billId = parseInt(req.params.id);
-
-    await prisma.item.deleteMany({ where: { billId } }); // ลบรายการเก่าทั้งหมด
-
-    const bill = await prisma.bill.update({
-      where: { id: billId },
+    await prisma.item.deleteMany({ where: { billId: id } });
+    const updated = await prisma.bill.update({
+      where: { id },
       data: {
         seller,
+        date: new Date(date),
         items: {
-          create: items.map((item) => ({
-            variety: item.variety,
-            grade: item.grade,
-            weight: parseFloat(item.weight),
-            weights: item.weights || [],
-            pricePerKg: parseFloat(item.pricePerKg),
+          create: items.map((i) => ({
+            variety: i.variety,
+            grade: i.grade,
+            weight: i.weight,
+            weights: i.weights || [],
+            pricePerKg: i.pricePerKg,
           })),
         },
       },
       include: { items: true },
     });
-
-    res.json(bill);
+    res.json(updated);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "แก้ไขบิลไม่สำเร็จ" });
+    res.status(500).send("Error updating bill");
   }
 });
 
