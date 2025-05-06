@@ -41,5 +41,5 @@ app.use("/v1/payroll", payrollRoute);
 app.use(notFound);
 app.use(errorMiddleware);
 
-const port = process.env.PORT || 9999;
+const port = process.env.PORT || 9997;
 app.listen(port, () => console.log(`✅ Server running on port ${port}`));
