@@ -64,10 +64,10 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-// ✅ GET /v1/bills/summary - สรุปตามวัน เกรด พันธุ์ พันธุ์+เกรด
 router.get("/summary/data", async (req, res) => {
   try {
     const items = await prisma.item.findMany({ include: { bill: true } });
+
     const summary = {
       byDate: {},
       byGrade: {},
@@ -78,20 +78,25 @@ router.get("/summary/data", async (req, res) => {
     for (const item of items) {
       const date = item.bill.date.toISOString().split("T")[0];
       const total = item.weight * item.pricePerKg;
+      const combo = `${item.variety} ${item.grade}`;
 
-      summary.byDate[date] = summary.byDate[date] || { total: 0, weight: 0 };
-      summary.byDate[date].total += total;
-      summary.byDate[date].weight += item.weight;
+      // ✅ แยก byDate เป็น nested: date -> combo
+      if (!summary.byDate[date]) summary.byDate[date] = {};
+      if (!summary.byDate[date][combo]) summary.byDate[date][combo] = { weight: 0, total: 0 };
+      summary.byDate[date][combo].weight += item.weight;
+      summary.byDate[date][combo].total += total;
 
+      // ✅ byGrade
       summary.byGrade[item.grade] = summary.byGrade[item.grade] || { total: 0, weight: 0 };
       summary.byGrade[item.grade].total += total;
       summary.byGrade[item.grade].weight += item.weight;
 
+      // ✅ byVariety
       summary.byVariety[item.variety] = summary.byVariety[item.variety] || { total: 0, weight: 0 };
       summary.byVariety[item.variety].total += total;
       summary.byVariety[item.variety].weight += item.weight;
 
-      const combo = `${item.variety} ${item.grade}`;
+      // ✅ byVarietyGrade
       summary.byVarietyGrade[combo] = summary.byVarietyGrade[combo] || { total: 0, weight: 0 };
       summary.byVarietyGrade[combo].total += total;
       summary.byVarietyGrade[combo].weight += item.weight;
@@ -103,6 +108,7 @@ router.get("/summary/data", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch summary" });
   }
 });
+
 
 
 
