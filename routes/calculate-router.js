@@ -95,7 +95,7 @@ router.get("/:id", async (req, res) => {
 });
 
 // 🔸 POST เพิ่มใหม่
-router.post("/", async (req, res) => {
+router.post("/history", async (req, res) => {
   try {
     const {
       farmName,
