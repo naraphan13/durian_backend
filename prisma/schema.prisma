@@ -180,3 +180,29 @@ model Deduction {
 }
 
 
+
+
+
+model GradeHistory {
+  id              Int      @id @default(autoincrement())
+  farmName        String
+  date            DateTime
+  totalWeight     Float
+  basePrice       Float
+  netAmount       Float
+  finalPrice      Float
+  remainingWeight Float
+  grades          Grade[]
+  createdAt       DateTime @default(now())
+}
+
+model Grade {
+  id              Int      @id @default(autoincrement())
+  name            String
+  weight          Float
+  price           Float
+  gradeHistory    GradeHistory @relation(fields: [gradeHistoryId], references: [id])
+  gradeHistoryId  Int
+}
+
+
