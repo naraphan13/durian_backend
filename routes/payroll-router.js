@@ -148,7 +148,6 @@ router.delete("/:id", async (req, res) => {
   }
 });
 
-// 🔸 GET PDF
 router.get("/:id/pdf", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
@@ -198,7 +197,7 @@ router.get("/:id/pdf", async (req, res) => {
     }).format(date);
 
     if (fs.existsSync(logoPath)) {
-      doc.image(logoPath, logoX, logoY, { fit: [logoSize, logoSize] });
+      doc.image(logoPath, logoY, logoY, { fit: [logoSize, logoSize] });
     }
 
     doc.font("thai").fontSize(13).text("บริษัท สุริยา388 จำกัด", companyX, topY);
@@ -241,19 +240,25 @@ router.get("/:id/pdf", async (req, res) => {
     doc.font("thai").fontSize(16).text("ใบสรุปเงินเดือนพนักงาน", 20);
     doc.font("thai-bold").fontSize(16).text("รายละเอียดค่าจ้าง:", 20);
 
+    // ✅ คำนวณสด totalPay
+    const totalPay =
+      data.payType === "รายวัน" || data.payType === "รายตู้"
+        ? (data.workDays || 0) * (data.pricePerDay || 0)
+        : (data.monthlySalary || 0) * (data.months || 0);
+
     if (data.payType === "รายวัน") {
       doc.font("thai").fontSize(16).text(
-        `รายวัน: ${data.workDays} วัน × ${data.pricePerDay} บาท = ${data.totalPay.toLocaleString()} บาท`,
+        `รายวัน: ${data.workDays} วัน × ${data.pricePerDay} บาท = ${totalPay.toLocaleString()} บาท`,
         20
       );
     } else if (data.payType === "รายเดือน") {
       doc.font("thai").fontSize(16).text(
-        `รายเดือน: ${data.monthlySalary} บาท × ${data.months} เดือน = ${data.totalPay.toLocaleString()} บาท`,
+        `รายเดือน: ${data.monthlySalary} บาท × ${data.months} เดือน = ${totalPay.toLocaleString()} บาท`,
         20
       );
     } else if (data.payType === "รายตู้") {
       doc.font("thai").fontSize(16).text(
-        `รายตู้: ${data.workDays} ตู้ × ${data.pricePerDay} บาท/ตู้ = ${data.totalPay.toLocaleString()} บาท`,
+        `รายตู้: ${data.workDays} ตู้ × ${data.pricePerDay} บาท/ตู้ = ${totalPay.toLocaleString()} บาท`,
         20
       );
     }
@@ -268,9 +273,9 @@ router.get("/:id/pdf", async (req, res) => {
       });
     }
 
-    const finalTotal = data.totalPay - totalDeduction;
+    const finalTotal = totalPay - totalDeduction;
     doc.moveDown(0.3);
-    doc.font("thai-bold").fontSize(16).text(`รวมทั้งหมด: ${data.totalPay.toLocaleString()} บาท`, 20);
+    doc.font("thai-bold").fontSize(16).text(`รวมทั้งหมด: ${totalPay.toLocaleString()} บาท`, 20);
     if (totalDeduction > 0) {
       doc.font("thai-bold").fontSize(16).text(`หักเบิก: ${totalDeduction.toLocaleString()} บาท`, 20);
       doc.font("thai-bold").fontSize(16).text(`คงเหลือหลังหัก: ${finalTotal.toLocaleString()} บาท`, 20);
