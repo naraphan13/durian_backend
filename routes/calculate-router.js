@@ -134,7 +134,6 @@ router.post("/history", async (req, res) => {
   }
 });
 
-// 🔸 PUT แก้ไข
 router.put("/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
@@ -143,26 +142,40 @@ router.put("/:id", async (req, res) => {
       date,
       totalWeight,
       basePrice,
-      netAmount,
-      finalPrice,
-      remainingWeight,
       grades,
     } = req.body;
 
-    // ลบเก่า
+    const parsedWeight = Number(totalWeight);
+    const parsedBasePrice = Number(basePrice);
+
+    let totalDeductions = 0;
+    let deductedWeight = 0;
+
+    for (const g of grades) {
+      const weight = Number(g.weight || 0);
+      const price = Number(g.price || 0);
+      totalDeductions += weight * price;
+      deductedWeight += weight;
+    }
+
+    const netAmount = parsedWeight * parsedBasePrice - totalDeductions;
+    const remainingWeight = parsedWeight - deductedWeight;
+    const finalPrice = remainingWeight > 0 ? netAmount / remainingWeight : 0;
+
+    // ลบของเก่า
     await prisma.grade.deleteMany({ where: { gradeHistoryId: id } });
 
-    // อัปเดตหัวตาราง
+    // อัปเดตตารางหลักและสร้างใหม่
     await prisma.gradeHistory.update({
       where: { id },
       data: {
         farmName,
         date: new Date(date),
-        totalWeight: parseFloat(totalWeight),
-        basePrice: parseFloat(basePrice),
-        netAmount: parseFloat(netAmount),
-        finalPrice: parseFloat(finalPrice),
-        remainingWeight: parseFloat(remainingWeight),
+        totalWeight: parsedWeight,
+        basePrice: parsedBasePrice,
+        netAmount,
+        finalPrice,
+        remainingWeight,
         grades: {
           create: grades.map((g) => ({
             name: g.name,
@@ -179,6 +192,7 @@ router.put("/:id", async (req, res) => {
     res.status(500).json({ error: "แก้ไขไม่สำเร็จ", detail: err.message });
   }
 });
+
 
 // 🔸 DELETE ลบ
 router.delete("/:id", async (req, res) => {
