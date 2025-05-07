@@ -43,5 +43,5 @@ app.use("/v1/calculate", calculateRoute);
 app.use(notFound);
 app.use(errorMiddleware);
 
-const port = process.env.PORT || 9997;
+const port = process.env.PORT || 9998;
 app.listen(port, () => console.log(`✅ Server running on port ${port}`));
