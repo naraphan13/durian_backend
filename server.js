@@ -36,7 +36,7 @@ app.use('/v1/containerloading', containerLoadingRouter);
 app.use("/v1/cuttingbills", cuttingRoute);
 app.use("/v1/sellbills", sellRoute);
 app.use("/v1/payroll", payrollRoute);
-app.use("/v1/calculate", calculateRoute);
+app.use("/v1/grade-history", calculateRoute);
 
 
 
