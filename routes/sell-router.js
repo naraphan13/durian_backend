@@ -155,13 +155,13 @@ router.get("/:id/pdf", async (req, res) => {
       timeZone: "Asia/Bangkok",
     }).format(date);
 
-    doc.font("thai").fontSize(13).text(`รหัสบิล: ${bill.id}    ขายให้: ${bill.customer}`, billInfoX, topY);
+    doc.font("thai").fontSize(13).text(`รหัสบิล: ${bill.id}    ชื่อ: ${bill.customer}`, billInfoX, topY);
     doc.font("thai").fontSize(13).text(`โดย: ___ เงินสด   ___ โอนผ่านบัญชีธนาคาร   เพื่อชำระ: ค่าทุเรียน`, billInfoX, topY + 18);
     doc.font("thai").fontSize(13).text(`วันที่: ${dateStr} `, billInfoX, topY + 36);
 
     // ===== หัวบิลกลางหน้า =====
     doc.moveDown(0.5);
-    doc.font("thai-bold").fontSize(17).text("ใบสำคัญจ่าย PAYMENT VOUCHER", doc.page.margins.left, doc.y, {
+    doc.font("thai-bold").fontSize(17).text("บิลเงินสด", doc.page.margins.left, doc.y, {
       align: "center",
       width: fullWidth,
     });
@@ -190,7 +190,15 @@ router.get("/:id/pdf", async (req, res) => {
       width: fullWidth,
     });
 
+    // ==== ลายเซ็น ====
+    const sigY = doc.page.height - 60;
+    doc.fontSize(11).text("...............................................", 40, sigY);
+    doc.text("ผู้จ่ายเงิน", 40, sigY + 12);
+    doc.text("ลงวันที่: ........../........../..........", 40, sigY + 24);
 
+    doc.text("...............................................", 340, sigY);
+    doc.text("ผู้รับเงิน", 340, sigY + 12);
+    doc.text("ลงวันที่: ........../........../..........", 340, sigY + 24);
 
     doc.end();
   } catch (err) {
