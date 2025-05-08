@@ -178,7 +178,7 @@ router.get("/:id/pdf", async (req, res) => {
       const sum = sumWeight * item.pricePerKg;
       total += sum;
 
-      doc.font("thai").fontSize(16).text(
+      doc.font("thai-bold").fontSize(16).text(
         `${i + 1}. ${item.variety} เกรด ${item.grade} | เข่ง: ${weights} กก. | น้ำหนักรวม: ${sumWeight} กก. × ${item.pricePerKg} = ${sum.toLocaleString()} บาท`,
         20
       );
