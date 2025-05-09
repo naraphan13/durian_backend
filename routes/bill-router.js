@@ -76,11 +76,16 @@ router.get("/summary/data", async (req, res) => {
     };
 
     for (const item of items) {
-      const date = item.bill.date.toISOString().split("T")[0];
+      // ✅ แปลงเวลา UTC -> Asia/Bangkok โดยใช้ JavaScript มาตรฐาน
+      const bangkokDate = new Date(
+        new Date(item.bill.date).toLocaleString("en-US", { timeZone: "Asia/Bangkok" })
+      );
+      const date = bangkokDate.toISOString().split("T")[0];
+
       const total = item.weight * item.pricePerKg;
       const combo = `${item.variety} ${item.grade}`;
 
-      // ✅ แยก byDate เป็น nested: date -> combo
+      // ✅ byDate
       if (!summary.byDate[date]) summary.byDate[date] = {};
       if (!summary.byDate[date][combo]) summary.byDate[date][combo] = { weight: 0, total: 0 };
       summary.byDate[date][combo].weight += item.weight;
