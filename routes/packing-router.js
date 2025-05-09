@@ -19,17 +19,29 @@ router.post('/', async (req, res) => {
   }
 });
 
-// ✅ GET - ดึงข้อมูลการแพ็คทั้งหมด
 router.get('/', async (req, res) => {
   try {
     const packings = await prisma.packing.findMany({
       orderBy: { date: 'desc' },
     });
-    res.json(packings);
+
+    const result = packings.map(p => {
+      const totalBig = p.bigBoxQuantity * p.bigBoxPrice;
+      const totalSmall = p.smallBoxQuantity * p.smallBoxPrice;
+      const totalBeforeDeduction = totalBig + totalSmall;
+
+      return {
+        ...p,
+        totalBeforeDeduction,
+      };
+    });
+
+    res.json(result);
   } catch (err) {
     res.status(500).json({ error: 'ไม่สามารถดึงข้อมูลได้', details: err });
   }
 });
+
 
 // ✅ GET - ดึงข้อมูลการแพ็คตาม id
 router.get('/:id', async (req, res) => {
@@ -197,7 +209,7 @@ router.post("/:id/pdf", async (req, res) => {
     doc.moveDown(0.2);
     doc.font("thai-bold").fontSize(16).text(`รวมทั้งหมด: ${total.toLocaleString()} บาท`, 20);
     if (totalDeduction > 0) {
-      doc.font("thai-bold").fontSize(16).text(`หักเบิก: ${totalDeduction.toLocaleString()} บาท`, 20);
+      doc.font("thai-bold").fontSize(16).text(`หัก: ${totalDeduction.toLocaleString()} บาท`, 20);
       doc.font("thai-bold").fontSize(16).text(`คงเหลือหลังหัก: ${finalTotal.toLocaleString()} บาท`, 20);
     }
 
