@@ -188,7 +188,8 @@ router.get("/:id/pdf", async (req, res) => {
     const billInfoX = companyX + 250;
 
     const createdDate = new Date(bill.createdAt);
-    const billDate = new Date(bill.date);
+    const billDateUTC = new Date(bill.date);
+    const billDate = new Date(billDateUTC.getTime() + 7 * 60 * 60 * 1000);
     const printDateStr = createdDate.toLocaleDateString("th-TH");
     const billDateStr = billDate.toLocaleDateString("th-TH", {
       day: "numeric",
@@ -228,7 +229,7 @@ router.get("/:id/pdf", async (req, res) => {
     let mainTotal = 0;
 
     doc.moveDown(0.5);
-    doc.font("thai-bold").fontSize(14).text(`วันที่ตัด: ${billDateStr}`, 20);
+    doc.font("thai-bold").fontSize(14).text(`วันที่: ${billDateStr}`, 20);
 
     if (bill.mainItems.length > 0) {
       bill.mainItems.forEach((item, i) => {
