@@ -248,7 +248,7 @@ router.get("/:id/pdf", async (req, res) => {
       `ยอดสุทธิ: ${netTotal.toLocaleString()} บาท`,
       0,
       lineY,
-      { align: "right", width: fullWidth - 80 }
+      { align: "right", width: fullWidth }
     );
 
     bill.extraDeductions.forEach((item, i) => {
