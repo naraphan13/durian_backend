@@ -14,13 +14,12 @@ router.post("/", async (req, res) => {
     const bill = await prisma.bill.create({
       data: {
         seller,
-        date: new Date(date), // ✅ ใช้วันที่จาก frontend
+        date: new Date(date),
         items: {
           create: items.map((item) => ({
             variety: item.variety,
             grade: item.grade,
             weight: parseFloat(item.weight),
-            weights: item.weights || [],
             pricePerKg: parseFloat(item.pricePerKg),
           })),
         },
@@ -138,7 +137,6 @@ router.delete("/:id", async (req, res) => {
 
 
 
-// ✅ PUT Update bill
 router.put("/:id", async (req, res) => {
   const id = parseInt(req.params.id);
   const { seller, date, items } = req.body;
@@ -155,7 +153,6 @@ router.put("/:id", async (req, res) => {
             variety: i.variety,
             grade: i.grade,
             weight: i.weight,
-            weights: i.weights || [],
             pricePerKg: i.pricePerKg,
           })),
         },
@@ -188,12 +185,12 @@ router.get("/:id/pdf", async (req, res) => {
     if (!bill) return res.status(404).send("Bill not found");
 
     const doc = new PDFDocument({
-      size: [396, 648], // A5 แนวนอน (9 x 5.5 นิ้ว)
+      size: [396, 648], // A5 แนวนอน
       margin: 20,
       layout: "landscape",
     });
 
-    // ฟอนต์
+    // โหลดฟอนต์
     const fontPath = path.join(__dirname, "../fonts/THSarabunNew.ttf");
     if (fs.existsSync(fontPath)) {
       doc.registerFont("thai", fontPath);
@@ -209,17 +206,15 @@ router.get("/:id/pdf", async (req, res) => {
     res.setHeader("Content-Disposition", `inline; filename="bill-${bill.id}.pdf"`);
     doc.pipe(res);
 
-    // ========== HEADER ========== //
+    // ==== HEADER ====
     const logoPath = path.join(__dirname, "../picture/S__5275654png (1).png");
     const logoSize = 70;
     const topY = 20;
-
     const logoX = 20;
     const logoY = topY + 10;
     const companyX = logoX + logoSize + 15;
     const billInfoX = companyX + 250;
 
-    // ✅ ปรับเวลา: เพิ่ม 7 ชั่วโมงให้ตรงกับ Asia/Bangkok
     const utcDate = new Date(bill.date);
     const bangkokDate = new Date(utcDate.getTime() + 7 * 60 * 60 * 1000);
 
@@ -235,56 +230,39 @@ router.get("/:id/pdf", async (req, res) => {
       hour12: false,
     }).format(bangkokDate);
 
-    // โลโก้ซ้ายสุด
     if (fs.existsSync(logoPath)) {
       doc.image(logoPath, logoX, logoY, { fit: [logoSize, logoSize] });
     }
 
-    // ข้อมูลบริษัท
     doc.font("thai").fontSize(13).text("บริษัท สุริยา388 จำกัด", companyX, topY);
-    doc.font("thai").fontSize(13).text(
-      "เลขที่ 203/2 ม.12 ต.บ้านนา อ.เมืองชุมพร จ.ชุมพร 86190",
-      companyX,
-      topY + 18
-    );
-    doc.font("thai").fontSize(13).text(
-      "โทร: 081-078-2324 , 082-801-1225 , 095-905-5588",
-      companyX,
-      topY + 36
-    );
+    doc.text("เลขที่ 203/2 ม.12 ต.บ้านนา อ.เมืองชุมพร จ.ชุมพร 86190", companyX, topY + 18);
+    doc.text("โทร: 081-078-2324 , 082-801-1225 , 095-905-5588", companyX, topY + 36);
 
-    // ข้อมูลบิล (ฝั่งขวา)
     doc.font("thai").fontSize(13).text(
-      `รหัสบิล: ${bill.id}    จ่ายให้: ${bill.seller}    `,
+      `รหัสบิล: ${bill.id}    จ่ายให้: ${bill.seller}`,
       billInfoX,
       topY
     );
-    doc.font("thai").fontSize(13).text(`โดย: ___ เงินสด   ___ โอนผ่านบัญชีธนาคาร   เพื่อชำระ: ค่าทุเรียน`, billInfoX, topY + 18);
-    doc.font("thai").fontSize(13).text(`วันที่: ${dateStr} เวลา: ${timeStr} น.`, billInfoX, topY + 36);
+    doc.text(`โดย: ___ เงินสด   ___ โอนผ่านบัญชีธนาคาร   เพื่อชำระ: ค่าทุเรียน`, billInfoX, topY + 18);
+    doc.text(`วันที่: ${dateStr} เวลา: ${timeStr} น.`, billInfoX, topY + 36);
 
-    // ใบสำคัญจ่าย (หัวกลางหน้า)
+    // ==== TITLE ====
     doc.moveDown(0.4);
-    doc.font("thai-bold").fontSize(17).text(
-      "ใบสำคัญจ่าย PAYMENT VOUCHER",
-      0,
-      doc.y,
-      {
-        align: "center",
-        width: doc.page.width,
-      }
-    );
+    doc.font("thai-bold").fontSize(17).text("ใบสำคัญจ่าย PAYMENT VOUCHER", 0, doc.y, {
+      align: "center",
+      width: doc.page.width,
+    });
 
-    // ========== รายการที่ซื้อ ========== //
+    // ==== รายการที่ซื้อ ====
     doc.moveDown(0.5);
     doc.font("thai-bold").fontSize(17).text("รายการที่ซื้อ:", 20);
 
     const summaryByVarietyGrade = {};
     bill.items.forEach((item, i) => {
-      const perBasket = item.weights?.join(" + ") || "-";
       const totalWeight = item.weight;
       const subtotal = item.weight * item.pricePerKg;
 
-      const line = `${i + 1}. ${item.variety} เกรด ${item.grade} | น้ำหนักต่อเข่ง: ${perBasket} กก. | น้ำหนักรวม: ${totalWeight} กก. x ${item.pricePerKg} บาท = ${subtotal.toLocaleString()} บาท`;
+      const line = `${i + 1}. ${item.variety} เกรด ${item.grade} | น้ำหนัก: ${totalWeight} กก. x ${item.pricePerKg} บาท = ${subtotal.toLocaleString()} บาท`;
       doc.font("thai-bold").fontSize(17).text(line, 20);
 
       const key = `${item.variety} ${item.grade}`;
@@ -298,16 +276,16 @@ router.get("/:id/pdf", async (req, res) => {
       align: "center",
     });
 
-    // ========== ลายเซ็น ========== //
+    // ==== ลายเซ็น ====
     const signatureBaseY = doc.page.height - 60;
 
     doc.fontSize(11).text("...............................................", 40, signatureBaseY);
-    doc.fontSize(11).text("ผู้จ่ายเงิน", 40, signatureBaseY + 12);
-    doc.fontSize(11).text("ลงวันที่: ........../........../..........", 40, signatureBaseY + 24);
+    doc.text("ผู้จ่ายเงิน", 40, signatureBaseY + 12);
+    doc.text("ลงวันที่: ........../........../..........", 40, signatureBaseY + 24);
 
-    doc.fontSize(11).text("...............................................", 340, signatureBaseY);
-    doc.fontSize(11).text("ผู้รับเงิน", 340, signatureBaseY + 12);
-    doc.fontSize(11).text("ลงวันที่: ........../........../..........", 340, signatureBaseY + 24);
+    doc.text("...............................................", 340, signatureBaseY);
+    doc.text("ผู้รับเงิน", 340, signatureBaseY + 12);
+    doc.text("ลงวันที่: ........../........../..........", 340, signatureBaseY + 24);
 
     doc.end();
   } catch (err) {
@@ -315,7 +293,6 @@ router.get("/:id/pdf", async (req, res) => {
     res.status(500).send("เกิดข้อผิดพลาด");
   }
 });
-
 
 
 
