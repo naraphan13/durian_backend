@@ -200,7 +200,7 @@ router.get("/:id/pdf", async (req, res) => {
     // ข้อมูลบิลฝั่งขวา (ใช้รูปแบบมาตรฐาน)
     doc.font("thai").fontSize(13).text(`รหัสบิล: ${bill.id}    จ่ายให้: ${bill.cutterName}`, billInfoX, topY);
     doc.font("thai").fontSize(13).text(`โดย: ___ เงินสด   ___ โอนผ่านบัญชีธนาคาร   เพื่อชำระ: ค่าตัดทุเรียน`, billInfoX, topY + 18);
-    doc.font("thai").fontSize(13).text(`วันที่: ${printDateStr} `, billInfoX, topY + 36);
+    // doc.font("thai").fontSize(13).text(`วันที่: ${printDateStr} `, billInfoX, topY + 36);
 
     // ==== TITLE CENTER ====
     doc.moveDown(0.5);
@@ -248,7 +248,7 @@ router.get("/:id/pdf", async (req, res) => {
       `ยอดสุทธิ: ${netTotal.toLocaleString()} บาท`,
       0,
       lineY,
-      { align: "right", width: fullWidth }
+      { align: "right", width: fullWidth - 80 }
     );
 
     bill.extraDeductions.forEach((item, i) => {
