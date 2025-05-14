@@ -203,7 +203,7 @@ router.get("/:id/pdf", async (req, res) => {
     // doc.font("thai").fontSize(13).text(`วันที่: ${printDateStr} `, billInfoX, topY + 36);
 
     // ==== TITLE CENTER ====
-    doc.moveDown(0.5);
+    doc.moveDown(2);
     doc.font("thai-bold").fontSize(17).text(
       "ใบสำคัญจ่าย PAYMENT VOUCHER",
       0,
@@ -248,7 +248,7 @@ router.get("/:id/pdf", async (req, res) => {
       `ยอดสุทธิ: ${netTotal.toLocaleString()} บาท`,
       0,
       lineY,
-      { align: "right", width: fullWidth }
+      { align: "right", width: fullWidth - 80 }
     );
 
     bill.extraDeductions.forEach((item, i) => {
