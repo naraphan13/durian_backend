@@ -150,6 +150,7 @@ model Payroll {
   pricePerDay   Float? // สำหรับรายวัน
   monthlySalary Float? // สำหรับรายเดือน
   months        Float? // จำนวนเดือนที่จ่าย (รายเดือน)
+  bonus          Float?       // ✅ เพิ่มตรงนี้
   totalPay      Float
   totalDeduct   Float
   netPay        Float

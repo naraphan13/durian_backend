@@ -34,107 +34,113 @@ router.get("/:id", async (req, res) => {
   }
 });
 
+// 🔸 POST สร้างใหม่
 router.post("/", async (req, res) => {
-    try {
-      const {
-        name,
-        date,
+  try {
+    const {
+      name,
+      date,
+      payType,
+      workDays,
+      pricePerDay,
+      monthlySalary,
+      months,
+      bonus,
+      deductions = [],
+    } = req.body;
+
+    const basePay = payType === "รายวัน"
+      ? parseFloat(workDays) * parseFloat(pricePerDay)
+      : parseFloat(monthlySalary) * parseFloat(months || 1);
+
+    const totalPay = basePay + parseFloat(bonus || 0);
+    const totalDeduct = deductions.reduce((sum, d) => sum + parseFloat(d.amount || 0), 0);
+    const netPay = totalPay - totalDeduct;
+
+    const payroll = await prisma.payroll.create({
+      data: {
+        employeeName: name,
+        date: new Date(date),
         payType,
-        workDays,
-        pricePerDay,
-        monthlySalary,
-        months,
-        deductions = [],
-      } = req.body;
-  
-      const totalPay = payType === "รายวัน"
-        ? parseFloat(workDays) * parseFloat(pricePerDay)
-        : parseFloat(monthlySalary) * parseFloat(months || 1);
-  
-      const totalDeduct = deductions.reduce((sum, d) => sum + parseFloat(d.amount || 0), 0);
-      const netPay = totalPay - totalDeduct;
-  
-      const payroll = await prisma.payroll.create({
-        data: {
-          employeeName: name,
-          date: new Date(date),
-          payType,
-          workDays: workDays ? parseFloat(workDays) : null,
-          pricePerDay: pricePerDay ? parseFloat(pricePerDay) : null,
-          monthlySalary: monthlySalary ? parseFloat(monthlySalary) : null,
-          months: months ? parseFloat(months) : null,
-          totalPay,
-          totalDeduct,
-          netPay,
-          deductions: {
-            create: deductions.map(d => ({
-              name: d.name,
-              amount: parseFloat(d.amount),
-            })),
-          },
+        workDays: workDays ? parseFloat(workDays) : null,
+        pricePerDay: pricePerDay ? parseFloat(pricePerDay) : null,
+        monthlySalary: monthlySalary ? parseFloat(monthlySalary) : null,
+        months: months ? parseFloat(months) : null,
+        bonus: parseFloat(bonus) || 0,
+        totalPay,
+        totalDeduct,
+        netPay,
+        deductions: {
+          create: deductions.map(d => ({
+            name: d.name,
+            amount: parseFloat(d.amount),
+          })),
         },
-      });
-  
-      res.json({ success: true, id: payroll.id });
-    } catch (err) {
-      console.error(err);
-      res.status(500).json({ error: "บันทึกไม่สำเร็จ" });
-    }
-  });
-  
-  
-  router.put("/:id", async (req, res) => {
-    try {
-      const id = Number(req.params.id);
-      const {
-        name,
-        date,
+      },
+    });
+
+    res.json({ success: true, id: payroll.id });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "บันทึกไม่สำเร็จ" });
+  }
+});
+
+// 🔸 PUT แก้ไข
+router.put("/:id", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const {
+      name,
+      date,
+      payType,
+      workDays,
+      pricePerDay,
+      monthlySalary,
+      months,
+      bonus,
+      deductions = [],
+    } = req.body;
+
+    const basePay = payType === "รายวัน"
+      ? parseFloat(workDays) * parseFloat(pricePerDay)
+      : parseFloat(monthlySalary) * parseFloat(months || 1);
+
+    const totalPay = basePay + parseFloat(bonus || 0);
+    const totalDeduct = deductions.reduce((sum, d) => sum + parseFloat(d.amount || 0), 0);
+    const netPay = totalPay - totalDeduct;
+
+    await prisma.deduction.deleteMany({ where: { payrollId: id } });
+
+    const updated = await prisma.payroll.update({
+      where: { id },
+      data: {
+        employeeName: name,
+        date: new Date(date),
         payType,
-        workDays,
-        pricePerDay,
-        monthlySalary,
-        months,
-        deductions = [],
-      } = req.body;
-  
-      const totalPay = payType === "รายวัน"
-        ? parseFloat(workDays) * parseFloat(pricePerDay)
-        : parseFloat(monthlySalary) * parseFloat(months || 1);
-  
-      const totalDeduct = deductions.reduce((sum, d) => sum + parseFloat(d.amount || 0), 0);
-      const netPay = totalPay - totalDeduct;
-  
-      await prisma.deduction.deleteMany({ where: { payrollId: id } });
-  
-      const updated = await prisma.payroll.update({
-        where: { id },
-        data: {
-          employeeName: name,
-          date: new Date(date),
-          payType,
-          workDays: workDays ? parseFloat(workDays) : null,
-          pricePerDay: pricePerDay ? parseFloat(pricePerDay) : null,
-          monthlySalary: monthlySalary ? parseFloat(monthlySalary) : null,
-          months: months ? parseFloat(months) : null,
-          totalPay,
-          totalDeduct,
-          netPay,
-          deductions: {
-            create: deductions.map(d => ({
-              name: d.name,
-              amount: parseFloat(d.amount),
-            })),
-          },
+        workDays: workDays ? parseFloat(workDays) : null,
+        pricePerDay: pricePerDay ? parseFloat(pricePerDay) : null,
+        monthlySalary: monthlySalary ? parseFloat(monthlySalary) : null,
+        months: months ? parseFloat(months) : null,
+        bonus: parseFloat(bonus) || 0,
+        totalPay,
+        totalDeduct,
+        netPay,
+        deductions: {
+          create: deductions.map(d => ({
+            name: d.name,
+            amount: parseFloat(d.amount),
+          })),
         },
-      });
-  
-      res.json({ success: true, id: updated.id });
-    } catch (err) {
-      console.log("err", err);
-      res.status(500).json({ error: "แก้ไขไม่สำเร็จ" });
-    }
-  });
-  
+      },
+    });
+
+    res.json({ success: true, id: updated.id });
+  } catch (err) {
+    console.log("err", err);
+    res.status(500).json({ error: "แก้ไขไม่สำเร็จ" });
+  }
+});
 
 // 🔸 DELETE
 router.delete("/:id", async (req, res) => {
