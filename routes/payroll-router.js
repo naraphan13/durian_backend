@@ -195,13 +195,6 @@ router.get("/:id/pdf", async (req, res) => {
       timeZone: "Asia/Bangkok",
     }).format(date);
 
-    const timeStr = new Intl.DateTimeFormat("th-TH", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-      timeZone: "Asia/Bangkok",
-    }).format(date);
-
     if (fs.existsSync(logoPath)) {
       doc.image(logoPath, logoY, logoY, { fit: [logoSize, logoSize] });
     }
@@ -246,29 +239,37 @@ router.get("/:id/pdf", async (req, res) => {
     doc.font("thai").fontSize(16).text("ใบสรุปเงินเดือนพนักงาน", 20);
     doc.font("thai-bold").fontSize(16).text("รายละเอียดค่าจ้าง:", 20);
 
-    // ✅ คำนวณสด totalPay
-    const totalPay =
+    // ✅ คำนวณค่าจ้างพื้นฐาน + โบนัส
+    const basePay =
       data.payType === "รายวัน" || data.payType === "รายตู้"
         ? (data.workDays || 0) * (data.pricePerDay || 0)
         : (data.monthlySalary || 0) * (data.months || 0);
+    const bonus = data.bonus || 0;
+    const totalPay = basePay + bonus;
 
     if (data.payType === "รายวัน") {
       doc.font("thai").fontSize(16).text(
-        `รายวัน: ${data.workDays} วัน × ${data.pricePerDay} บาท = ${totalPay.toLocaleString()} บาท`,
+        `รายวัน: ${data.workDays} วัน × ${data.pricePerDay} บาท = ${basePay.toLocaleString()} บาท`,
         20
       );
     } else if (data.payType === "รายเดือน") {
       doc.font("thai").fontSize(16).text(
-        `รายเดือน: ${data.monthlySalary} บาท × ${data.months} เดือน = ${totalPay.toLocaleString()} บาท`,
+        `รายเดือน: ${data.monthlySalary} บาท × ${data.months} เดือน = ${basePay.toLocaleString()} บาท`,
         20
       );
     } else if (data.payType === "รายตู้") {
       doc.font("thai").fontSize(16).text(
-        `รายตู้: ${data.workDays} ตู้ × ${data.pricePerDay} บาท/ตู้ = ${totalPay.toLocaleString()} บาท`,
+        `รายตู้: ${data.workDays} ตู้ × ${data.pricePerDay} บาท/ตู้ = ${basePay.toLocaleString()} บาท`,
         20
       );
     }
 
+    // ✅ แสดงโบนัสถ้ามี
+    if (bonus > 0) {
+      doc.font("thai").fontSize(16).text(`พิเศษ: ${bonus.toLocaleString()} บาท`, 20);
+    }
+
+    // ✅ รายการหัก
     let totalDeduction = 0;
     if (Array.isArray(data.deductions) && data.deductions.length > 0) {
       doc.moveDown(0.2);
@@ -302,5 +303,6 @@ router.get("/:id/pdf", async (req, res) => {
     res.status(500).json({ error: "เกิดข้อผิดพลาดในการสร้าง PDF", details: err });
   }
 });
+
 
 module.exports = router;
