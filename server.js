@@ -45,5 +45,5 @@ app.use("/v1/seasons", seasonRoute);
 app.use(notFound);
 app.use(errorMiddleware);
 
-const port = process.env.PORT || 9998;
+const port = process.env.PORT || 9999;
 app.listen(port, () => console.log(`✅ Server running on port ${port}`));
