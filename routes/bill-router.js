@@ -10,10 +10,16 @@ const path = require("path");
 // ✅ POST /v1/bills - บันทึกบิลใหม่ (ใส่วันที่เองได้)
 router.post("/", async (req, res) => {
   const { seller, date, items } = req.body;
-  try {
-    const billDate = new Date(date);
 
-    // ✅ หา season ที่ครอบคลุมวันที่ของบิล
+  // ฟังก์ชันตัดเวลาออก (ให้เหลือแค่ปี-เดือน-วัน)
+  function toDateOnly(date) {
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  }
+
+  try {
+    const billDate = toDateOnly(new Date(date));
+
+    // ✅ หา season ที่ครอบคลุมวันที่ (เปรียบเทียบแบบไม่สนเวลา)
     const season = await prisma.season.findFirst({
       where: {
         startDate: { lte: billDate },
@@ -27,7 +33,7 @@ router.post("/", async (req, res) => {
     const bill = await prisma.bill.create({
       data: {
         seller,
-        date: billDate,
+        date: new Date(date), // เก็บเวลาจริงไว้
         seasonId: season?.id || null,
         items: {
           create: items.map((item) => ({
@@ -40,12 +46,14 @@ router.post("/", async (req, res) => {
       },
       include: { items: true },
     });
+
     res.json(bill);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to create bill" });
   }
 });
+
 
 
 // ✅ GET /v1/bills - ดูบิลทั้งหมด
@@ -149,12 +157,19 @@ router.delete("/:id", async (req, res) => {
 
 
 
+// ✅ PUT /v1/bills/:id - อัปเดตบิล
 router.put("/:id", async (req, res) => {
   const id = parseInt(req.params.id);
   const { seller, date, items } = req.body;
 
+  // ฟังก์ชันตัดเวลาออก
+  function toDateOnly(date) {
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  }
+
   try {
-    const billDate = new Date(date);
+    const billDate = toDateOnly(new Date(date));
+
     const season = await prisma.season.findFirst({
       where: {
         startDate: { lte: billDate },
@@ -166,29 +181,32 @@ router.put("/:id", async (req, res) => {
     });
 
     await prisma.item.deleteMany({ where: { billId: id } });
+
     const updated = await prisma.bill.update({
       where: { id },
       data: {
         seller,
-        date: billDate,
+        date: new Date(date),
         seasonId: season?.id || null,
         items: {
           create: items.map((i) => ({
             variety: i.variety,
             grade: i.grade,
-            weight: i.weight,
-            pricePerKg: i.pricePerKg,
+            weight: parseFloat(i.weight),
+            pricePerKg: parseFloat(i.pricePerKg),
           })),
         },
       },
       include: { items: true },
     });
+
     res.json(updated);
   } catch (err) {
     console.error(err);
     res.status(500).send("Error updating bill");
   }
 });
+
 
 
 
