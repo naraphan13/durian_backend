@@ -33,11 +33,12 @@ model Bill {
 }
 
 model Season {
-  id        Int       @id @default(autoincrement())
-  name      String    @unique // เช่น "2025-chanthaburi"
-  startDate DateTime
-  endDate   DateTime? // ✅ ยังไม่รู้วันปิดก็ใส่ null ได้
-  bills     Bill[] // ✅ Relation กลับไปยัง Bill
+  id              Int               @id @default(autoincrement())
+  name            String            @unique // เช่น "2025-chanthaburi"
+  startDate       DateTime
+  endDate         DateTime? // ✅ ยังไม่รู้วันปิดก็ใส่ null ได้
+  bills           Bill[] // ✅ Relation กลับไปยัง Bill
+  ExportContainer ExportContainer[]
 }
 
 model Item {
@@ -66,6 +67,8 @@ model ExportContainer {
   brandSummary  String?  @db.Text
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+  seasonId      Int? // FK (nullable สำหรับข้อมูลเก่า)
+  season        Season?  @relation(fields: [seasonId], references: [id])
 }
 
 model Packing {

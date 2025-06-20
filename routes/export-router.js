@@ -114,31 +114,51 @@ router.post('/exportpdf', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
-    const newExport = await prisma.exportContainer.create({
-      data: req.body,
+    function toDateOnly(d) {
+      const dt = new Date(d);
+      return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate());
+    }
+
+    const billDate = toDateOnly(new Date(req.body.date));
+    const season = await prisma.season.findFirst({
+      where: {
+        startDate: { lte: billDate },
+        OR: [
+          { endDate: null },
+          { endDate: { gte: billDate } },
+        ],
+      },
     });
+
+    const newExport = await prisma.exportContainer.create({
+      data: {
+        ...req.body,
+        seasonId: season?.id || null,
+      },
+    });
+
     res.json(newExport);
   } catch (err) {
     console.error("❌ POST /v1/export error::", err);
-    console.log('err', err)
     res.status(500).json({ error: 'เกิดข้อผิดพลาดในการบันทึก', details: err });
   }
 });
 
-// READ ALL: ดึงรายการเอกสารทั้งหมด
+// ✅ READ ALL: รองรับ ?seasonId=...
 router.get('/', async (req, res) => {
   try {
+    const seasonId = parseInt(req.query.seasonId);
     const exports = await prisma.exportContainer.findMany({
+      where: seasonId ? { seasonId } : {},
       orderBy: { date: 'desc' },
     });
-    console.log(exports);
     res.json(exports);
   } catch (err) {
     res.status(500).json({ error: 'ไม่สามารถดึงรายการได้', details: err });
   }
 });
 
-// READ ONE: ดึงเอกสารตาม ID
+// ✅ READ ONE
 router.get('/:id', async (req, res) => {
   try {
     const exportDoc = await prisma.exportContainer.findUnique({
@@ -150,13 +170,34 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// UPDATE: แก้ไขเอกสารตาม ID
+
+// ✅ UPDATE พร้อมคำนวณ seasonId ใหม่
 router.put('/:id', async (req, res) => {
   try {
+    function toDateOnly(d) {
+      const dt = new Date(d);
+      return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate());
+    }
+
+    const billDate = toDateOnly(new Date(req.body.date));
+    const season = await prisma.season.findFirst({
+      where: {
+        startDate: { lte: billDate },
+        OR: [
+          { endDate: null },
+          { endDate: { gte: billDate } },
+        ],
+      },
+    });
+
     const updated = await prisma.exportContainer.update({
       where: { id: parseInt(req.params.id) },
-      data: req.body,
+      data: {
+        ...req.body,
+        seasonId: season?.id || null,
+      },
     });
+
     res.json(updated);
   } catch (err) {
     res.status(500).json({ error: 'อัปเดตไม่สำเร็จ', details: err });
@@ -174,5 +215,59 @@ router.delete('/:id', async (req, res) => {
     res.status(500).json({ error: 'ลบไม่สำเร็จ', details: err });
   }
 });
+
+
+
+
+
+
+
+
+
+
+
+
+router.get('/summarypdf', async (req, res) => {
+  const seasonId = parseInt(req.query.seasonId);
+  if (!seasonId) return res.status(400).send("seasonId required");
+
+  const season = await prisma.season.findUnique({ where: { id: seasonId } });
+  const exports = await prisma.exportContainer.findMany({ where: { seasonId } });
+
+  const doc = new PDFDocument({ size: 'A4', margin: 40 });
+  let buffers = [];
+  doc.on('data', buffers.push.bind(buffers));
+  doc.on('end', () => {
+    const pdfData = Buffer.concat(buffers);
+    res.writeHead(200, {
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename=summary-season-${seasonId}.pdf`,
+      'Content-Length': pdfData.length,
+    });
+    res.end(pdfData);
+  });
+
+  doc.fontSize(20).text(`📦 รายงานสรุปการส่งออกทุเรียน - ฤดูกาล ${season.name}`, { align: 'center' });
+  doc.moveDown();
+  doc.fontSize(14).text(`ช่วงเวลา: ${new Date(season.startDate).toLocaleDateString('th-TH')} - ${season.endDate ? new Date(season.endDate).toLocaleDateString('th-TH') : 'ปัจจุบัน'}`);
+  doc.moveDown();
+
+  let totalSum = 0;
+  exports.forEach((exp, i) => {
+    const durianTotal = exp.durianItems?.reduce((sum, d) => sum + (d.boxes * d.weightPerBox * d.pricePerKg), 0) || 0;
+    const boxTotal = Object.values(exp.boxCosts || {}).reduce((sum, b) => sum + (b.quantity * b.unitCost), 0);
+    const handleTotal = Object.values(exp.handlingCosts || {}).reduce((sum, h) => sum + (h.weight * h.costPerKg), 0);
+    const freightTotal = exp.freightItems?.reduce((sum, f) => sum + (f.weight * f.pricePerKg), 0) || 0;
+    const total = durianTotal + boxTotal + handleTotal + freightTotal + (exp.inspectionFee || 0);
+    totalSum += total;
+
+    doc.fontSize(12).text(`${i + 1}. วันที่: ${exp.date} | เมือง: ${exp.city} | รหัสตู้: ${exp.containerCode} | รวม: ${total.toLocaleString()} บาท`);
+  });
+
+  doc.moveDown();
+  doc.fontSize(16).text(`รวมยอดทั้งฤดูกาล: ${totalSum.toLocaleString()} บาท`, { align: 'right' });
+  doc.end();
+});
+
 
 module.exports = router;
