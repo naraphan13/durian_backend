@@ -248,6 +248,10 @@ router.get("/summarypdf", async (req, res) => {
       res.end(pdfData);
     });
 
+    doc.on("error", (err) => {
+      console.error("❌ PDFKit generation error:", err);
+    });
+
     doc.fontSize(20).text(`📦 รายงานสรุปการส่งออกทุเรียน - ฤดูกาล ${season.name}`, { align: "center" });
     doc.moveDown();
     doc.fontSize(14).text(
@@ -306,7 +310,7 @@ router.get("/summarypdf", async (req, res) => {
     doc.fontSize(16).text(`รวมยอดทั้งฤดูกาล: ${Number(totalSum).toLocaleString()} บาท`, { align: "right" });
     doc.end();
   } catch (err) {
-    console.error("/summarypdf error::", err);
+    console.error("/summarypdf error::", util.inspect(err, { depth: null }));
     res.status(500).send("เกิดข้อผิดพลาดขณะสร้าง PDF");
   }
 });
