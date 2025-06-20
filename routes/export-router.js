@@ -289,16 +289,21 @@ router.get("/summarypdf", async (req, res) => {
         console.warn(`⚠️ freightItems format invalid for export ID ${exp.id}`);
       }
 
-      const total = durianTotal + boxTotal + handleTotal + freightTotal + (exp.inspectionFee || 0);
+      const inspectionFee = Number(exp.inspectionFee) || 0;
+      const total = durianTotal + boxTotal + handleTotal + freightTotal + inspectionFee;
       totalSum += total;
 
-      doc.fontSize(12).text(
-        `${i + 1}. วันที่: ${exp.date} | เมือง: ${exp.city} | รหัสตู้: ${exp.containerCode} | รวม: ${total.toLocaleString()} บาท`
-      );
+      try {
+        doc.fontSize(12).text(
+          `${i + 1}. วันที่: ${exp.date} | เมือง: ${exp.city} | รหัสตู้: ${exp.containerCode} | รวม: ${Number(total).toLocaleString()} บาท`
+        );
+      } catch (err) {
+        console.warn(`⚠️ export ID ${exp.id} render failed`, err);
+      }
     });
 
     doc.moveDown();
-    doc.fontSize(16).text(`รวมยอดทั้งฤดูกาล: ${totalSum.toLocaleString()} บาท`, { align: "right" });
+    doc.fontSize(16).text(`รวมยอดทั้งฤดูกาล: ${Number(totalSum).toLocaleString()} บาท`, { align: "right" });
     doc.end();
   } catch (err) {
     console.error("/summarypdf error::", err);
