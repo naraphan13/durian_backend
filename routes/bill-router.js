@@ -11,10 +11,24 @@ const path = require("path");
 router.post("/", async (req, res) => {
   const { seller, date, items } = req.body;
   try {
+    const billDate = new Date(date);
+
+    // ✅ หา season ที่ครอบคลุมวันที่ของบิล
+    const season = await prisma.season.findFirst({
+      where: {
+        startDate: { lte: billDate },
+        OR: [
+          { endDate: null },
+          { endDate: { gte: billDate } }
+        ]
+      }
+    });
+
     const bill = await prisma.bill.create({
       data: {
         seller,
-        date: new Date(date),
+        date: billDate,
+        seasonId: season?.id || null,
         items: {
           create: items.map((item) => ({
             variety: item.variety,
@@ -65,7 +79,11 @@ router.get("/:id", async (req, res) => {
 
 router.get("/summary/data", async (req, res) => {
   try {
-    const items = await prisma.item.findMany({ include: { bill: true } });
+    const seasonId = parseInt(req.query.seasonId);
+    const items = await prisma.item.findMany({
+      where: seasonId ? { bill: { seasonId } } : {},
+      include: { bill: true },
+    });
 
     const summary = {
       byDate: {},
@@ -75,32 +93,26 @@ router.get("/summary/data", async (req, res) => {
     };
 
     for (const item of items) {
-      // ✅ แปลงเวลา UTC -> Asia/Bangkok โดยใช้ JavaScript มาตรฐาน
       const bangkokDate = new Date(
         new Date(item.bill.date).toLocaleString("en-US", { timeZone: "Asia/Bangkok" })
       );
       const date = bangkokDate.toISOString().split("T")[0];
-
       const total = item.weight * item.pricePerKg;
       const combo = `${item.variety} ${item.grade}`;
 
-      // ✅ byDate
       if (!summary.byDate[date]) summary.byDate[date] = {};
       if (!summary.byDate[date][combo]) summary.byDate[date][combo] = { weight: 0, total: 0 };
       summary.byDate[date][combo].weight += item.weight;
       summary.byDate[date][combo].total += total;
 
-      // ✅ byGrade
       summary.byGrade[item.grade] = summary.byGrade[item.grade] || { total: 0, weight: 0 };
       summary.byGrade[item.grade].total += total;
       summary.byGrade[item.grade].weight += item.weight;
 
-      // ✅ byVariety
       summary.byVariety[item.variety] = summary.byVariety[item.variety] || { total: 0, weight: 0 };
       summary.byVariety[item.variety].total += total;
       summary.byVariety[item.variety].weight += item.weight;
 
-      // ✅ byVarietyGrade
       summary.byVarietyGrade[combo] = summary.byVarietyGrade[combo] || { total: 0, weight: 0 };
       summary.byVarietyGrade[combo].total += total;
       summary.byVarietyGrade[combo].weight += item.weight;
@@ -142,12 +154,24 @@ router.put("/:id", async (req, res) => {
   const { seller, date, items } = req.body;
 
   try {
+    const billDate = new Date(date);
+    const season = await prisma.season.findFirst({
+      where: {
+        startDate: { lte: billDate },
+        OR: [
+          { endDate: null },
+          { endDate: { gte: billDate } }
+        ]
+      }
+    });
+
     await prisma.item.deleteMany({ where: { billId: id } });
     const updated = await prisma.bill.update({
       where: { id },
       data: {
         seller,
-        date: new Date(date),
+        date: billDate,
+        seasonId: season?.id || null,
         items: {
           create: items.map((i) => ({
             variety: i.variety,

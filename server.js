@@ -17,6 +17,7 @@ const cuttingRoute = require('./routes/cutting-router');
 const sellRoute = require('./routes/sell-router');
 const payrollRoute = require('./routes/payroll-router');
 const calculateRoute = require('./routes/calculate-router');
+const seasonRoute = require('./routes/season-router');
 const app = express();
 
 app.use(cors({
@@ -37,6 +38,7 @@ app.use("/v1/cuttingbills", cuttingRoute);
 app.use("/v1/sellbills", sellRoute);
 app.use("/v1/payroll", payrollRoute);
 app.use("/v1/calculate", calculateRoute);
+app.use("/v1/seasons", seasonRoute);
 
 
 

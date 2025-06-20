@@ -24,10 +24,20 @@ model User {
 }
 
 model Bill {
-  id     Int      @id @default(autoincrement())
-  date   DateTime @default(now())
-  seller String
-  items  Item[]
+  id       Int      @id @default(autoincrement())
+  date     DateTime @default(now())
+  seller   String
+  items    Item[]
+  seasonId Int? // ✅ เพิ่ม
+  season   Season?  @relation(fields: [seasonId], references: [id]) // ✅ เพิ่ม
+}
+
+model Season {
+  id        Int       @id @default(autoincrement())
+  name      String    @unique // เช่น "2025-chanthaburi"
+  startDate DateTime
+  endDate   DateTime? // ✅ ยังไม่รู้วันปิดก็ใส่ null ได้
+  bills     Bill[] // ✅ Relation กลับไปยัง Bill
 }
 
 model Item {
@@ -150,7 +160,7 @@ model Payroll {
   pricePerDay   Float? // สำหรับรายวัน
   monthlySalary Float? // สำหรับรายเดือน
   months        Float? // จำนวนเดือนที่จ่าย (รายเดือน)
-  bonus          Float?       // ✅ เพิ่มตรงนี้
+  bonus         Float? // ✅ เพิ่มตรงนี้
   totalPay      Float
   totalDeduct   Float
   netPay        Float
