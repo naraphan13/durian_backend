@@ -232,8 +232,13 @@ router.get("/summarypdf", async (req, res) => {
   if (!seasonId) return res.status(400).send("seasonId required");
 
   try {
+    console.log("📌 เริ่มสร้าง PDF สำหรับ seasonId:", seasonId);
+
     const season = await prisma.season.findUnique({ where: { id: seasonId } });
+    console.log("✅ Season:", season);
+
     const exports = await prisma.exportContainer.findMany({ where: { seasonId } });
+    console.log("✅ พบ export:", exports.length);
 
     const doc = new PDFDocument({ size: "A4", margin: 40 });
     let buffers = [];
@@ -252,6 +257,10 @@ router.get("/summarypdf", async (req, res) => {
       console.error("❌ PDFKit generation error:", err);
     });
 
+    // บันทึกไฟล์ชั่วคราวสำหรับตรวจสอบ (option)
+    const out = fs.createWriteStream(`debug-summary-${seasonId}.pdf`);
+    doc.pipe(out);
+
     doc.fontSize(20).text(`📦 รายงานสรุปการส่งออกทุเรียน - ฤดูกาล ${season.name}`, { align: "center" });
     doc.moveDown();
     doc.fontSize(14).text(
@@ -261,6 +270,8 @@ router.get("/summarypdf", async (req, res) => {
 
     let totalSum = 0;
     exports.forEach((exp, i) => {
+      console.log(`🔍 export ID ${exp.id}`);
+
       let durianTotal = 0;
       try {
         const durians = Array.isArray(exp.durianItems) ? exp.durianItems : JSON.parse(exp.durianItems || "[]");
