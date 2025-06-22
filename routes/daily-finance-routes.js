@@ -300,7 +300,7 @@ router.get("/:id/pdf", async (req, res) => {
     doc.text("เลขที่ 203/2 ม.12 ต.บ้านนา อ.เมืองชุมพร จ.ชุมพร 86190", companyX, topY + 18);
     doc.text("โทร: 081-078-2324 , 082-801-1225 , 095-905-5588", companyX, topY + 36);
 
-    doc.font("thai").fontSize(13).text(`วันที่: ${dateStr} เวลา: ${timeStr} น.`, infoX, topY);
+    doc.font("thai").fontSize(13).text(`วันที่: ${dateStr} `, infoX, topY);
 
     doc.moveDown(2);
     doc.font("thai-bold").fontSize(17).text("ใบสรุปรายวัน / Daily Financial Report", 0, doc.y, {
