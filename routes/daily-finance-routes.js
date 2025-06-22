@@ -1,6 +1,9 @@
 const express = require("express");
 const router = express.Router();
 const prisma = require("../models/prisma");
+const PDFDocument = require('pdfkit');
+const fs = require('fs');
+const path = require('path');
 
 // ✅ GET /v1/dailyfinance - ดูทั้งหมดหรือระบุวันที่
 router.get("/", async (req, res) => {
