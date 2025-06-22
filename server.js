@@ -47,5 +47,5 @@ app.use('/v1/dailyfinance', dailyFinanceRoute);
 app.use(notFound);
 app.use(errorMiddleware);
 
-const port = process.env.PORT || 9999;
+const port = process.env.PORT || 9988;
 app.listen(port, () => console.log(`✅ Server running on port ${port}`));
