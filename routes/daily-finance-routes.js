@@ -234,13 +234,7 @@ router.patch("/expensenote/:id", async (req, res) => {
 
 
 
-// 📁 routes/dailyfinance-router.js
-const express = require("express");
-const router = express.Router();
-const prisma = require("../models/prisma");
-const PDFDocument = require("pdfkit");
-const fs = require("fs");
-const path = require("path");
+
 
 // ✅ รายงานรายวัน (PDF พร้อมหัวกระดาษ)
 router.get("/:id/pdf", async (req, res) => {
