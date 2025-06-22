@@ -227,6 +227,20 @@ router.delete('/:id', async (req, res) => {
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 router.get("/summarypdf", async (req, res) => {
   const seasonId = parseInt(req.query.seasonId);
   if (!seasonId) return res.status(400).send("seasonId required");

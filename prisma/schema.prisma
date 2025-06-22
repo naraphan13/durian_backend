@@ -214,3 +214,32 @@ model MainItem {
   cuttingBillId Int
   cuttingBill   CuttingBill @relation(fields: [cuttingBillId], references: [id], onDelete: Cascade)
 }
+
+
+
+
+
+model DailyFinance {
+  id            Int           @id @default(autoincrement())
+  date          DateTime
+  createdBy     String
+  incomeNotes   IncomeNote[]
+  expenseNotes  ExpenseNote[]
+  createdAt     DateTime      @default(now())
+}
+
+model IncomeNote {
+  id             Int           @id @default(autoincrement())
+  label          String
+  amount         Float
+  dailyFinance   DailyFinance  @relation(fields: [dailyFinanceId], references: [id], onDelete: Cascade)
+  dailyFinanceId Int
+}
+
+model ExpenseNote {
+  id             Int           @id @default(autoincrement())
+  label          String
+  amount         Float
+  dailyFinance   DailyFinance  @relation(fields: [dailyFinanceId], references: [id], onDelete: Cascade)
+  dailyFinanceId Int
+}
