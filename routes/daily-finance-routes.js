@@ -2,9 +2,27 @@ const express = require("express");
 const router = express.Router();
 const prisma = require("../models/prisma");
 
-// ✅ GET /v1/dailyfinance - ดูทั้งหมดเรียงตามวันที่ใหม่สุด
+// ✅ GET /v1/dailyfinance - ดูทั้งหมดหรือระบุวันที่
 router.get("/", async (req, res) => {
   try {
+    const { date } = req.query;
+    if (date) {
+      const target = new Date(date);
+      const start = new Date(target.setHours(0, 0, 0, 0));
+      const end = new Date(target.setHours(23, 59, 59, 999));
+
+      const record = await prisma.dailyFinance.findFirst({
+        where: {
+          date: {
+            gte: start,
+            lte: end,
+          },
+        },
+        include: { incomeNotes: true, expenseNotes: true },
+      });
+      return res.json(record);
+    }
+
     const records = await prisma.dailyFinance.findMany({
       orderBy: { date: "desc" },
       include: { incomeNotes: true, expenseNotes: true },
@@ -54,7 +72,7 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-// ✅ PUT /v1/dailyfinance/:id - แก้ไข
+// ✅ PUT /v1/dailyfinance/:id - แก้ไขทั้งชุด
 router.put("/:id", async (req, res) => {
   const id = parseInt(req.params.id);
   const { date, createdBy, incomeNotes = [], expenseNotes = [] } = req.body;
@@ -92,6 +110,84 @@ router.delete("/:id", async (req, res) => {
     res.json({ message: "ลบสำเร็จ" });
   } catch (err) {
     res.status(500).json({ error: "ลบไม่สำเร็จ" });
+  }
+});
+
+// ✅ PATCH /v1/dailyfinance/:id/add-income - เพิ่มรายรับ
+router.patch("/:id/add-income", async (req, res) => {
+  const id = parseInt(req.params.id);
+  const { label, amount } = req.body;
+  try {
+    const income = await prisma.incomeNote.create({
+      data: { label, amount: Number(amount), dailyFinanceId: id },
+    });
+    res.json(income);
+  } catch (err) {
+    console.error("PATCH /add-income error::", err);
+    res.status(500).json({ error: "เพิ่มรายรับไม่สำเร็จ" });
+  }
+});
+
+// ✅ PATCH /v1/dailyfinance/:id/add-expense - เพิ่มรายจ่าย
+router.patch("/:id/add-expense", async (req, res) => {
+  const id = parseInt(req.params.id);
+  const { label, amount } = req.body;
+  try {
+    const expense = await prisma.expenseNote.create({
+      data: { label, amount: Number(amount), dailyFinanceId: id },
+    });
+    res.json(expense);
+  } catch (err) {
+    console.error("PATCH /add-expense error::", err);
+    res.status(500).json({ error: "เพิ่มรายจ่ายไม่สำเร็จ" });
+  }
+});
+
+// ✅ DELETE /v1/incomenote/:id - ลบรายรับเฉพาะรายการ
+router.delete("/incomenote/:id", async (req, res) => {
+  try {
+    await prisma.incomeNote.delete({ where: { id: parseInt(req.params.id) } });
+    res.json({ message: "ลบรายรับเรียบร้อย" });
+  } catch (err) {
+    res.status(500).json({ error: "ลบรายรับไม่สำเร็จ" });
+  }
+});
+
+// ✅ DELETE /v1/expensenote/:id - ลบรายจ่ายเฉพาะรายการ
+router.delete("/expensenote/:id", async (req, res) => {
+  try {
+    await prisma.expenseNote.delete({ where: { id: parseInt(req.params.id) } });
+    res.json({ message: "ลบรายจ่ายเรียบร้อย" });
+  } catch (err) {
+    res.status(500).json({ error: "ลบรายจ่ายไม่สำเร็จ" });
+  }
+});
+
+// ✅ PATCH /v1/incomenote/:id - แก้ไขรายรับ
+router.patch("/incomenote/:id", async (req, res) => {
+  const { label, amount } = req.body;
+  try {
+    const updated = await prisma.incomeNote.update({
+      where: { id: parseInt(req.params.id) },
+      data: { label, amount: Number(amount) },
+    });
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ error: "แก้ไขรายรับไม่สำเร็จ" });
+  }
+});
+
+// ✅ PATCH /v1/expensenote/:id - แก้ไขรายจ่าย
+router.patch("/expensenote/:id", async (req, res) => {
+  const { label, amount } = req.body;
+  try {
+    const updated = await prisma.expenseNote.update({
+      where: { id: parseInt(req.params.id) },
+      data: { label, amount: Number(amount) },
+    });
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ error: "แก้ไขรายจ่ายไม่สำเร็จ" });
   }
 });
 
