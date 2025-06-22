@@ -234,6 +234,15 @@ router.patch("/expensenote/:id", async (req, res) => {
 
 
 
+// 📁 routes/dailyfinance-router.js
+const express = require("express");
+const router = express.Router();
+const prisma = require("../models/prisma");
+const PDFDocument = require("pdfkit");
+const fs = require("fs");
+const path = require("path");
+
+// ✅ รายงานรายวัน (PDF พร้อมหัวกระดาษ)
 router.get("/:id/pdf", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
@@ -276,10 +285,12 @@ router.get("/:id/pdf", async (req, res) => {
     const infoX = companyX + 250;
 
     const createdDate = new Date();
+    const bangkokTime = new Date(createdDate.toLocaleString("en-US", { timeZone: "Asia/Bangkok" }));
+
     const dateStr = new Date(record.date).toLocaleDateString("th-TH", {
       day: "numeric", month: "long", year: "numeric",
     });
-    const timeStr = createdDate.toLocaleTimeString("th-TH", {
+    const timeStr = bangkokTime.toLocaleTimeString("th-TH", {
       hour: "2-digit", minute: "2-digit", hour12: false,
     });
 
@@ -294,20 +305,18 @@ router.get("/:id/pdf", async (req, res) => {
     doc.font("thai").fontSize(13).text(`วันที่: ${dateStr} เวลา: ${timeStr} น.`, infoX, topY);
 
     doc.moveDown(2);
-    doc.font("thai-bold").fontSize(17).text(
-      "ใบสรุปรายวัน / Daily Financial Report",
-      0,
-      doc.y,
-      { align: "center", width: fullWidth }
-    );
+    doc.font("thai-bold").fontSize(17).text("ใบสรุปรายวัน / Daily Financial Report", 0, doc.y, {
+      align: "center",
+      width: fullWidth,
+    });
 
-    // รวมรายรับ/รายจ่ายเป็นหนึ่งลิสต์
+    // รวมรายการทั้งหมดเข้าอาร์เรย์เดียว พร้อมประเภท
     const allNotes = [
       ...record.incomeNotes.map(n => ({ ...n, type: "income" })),
       ...record.expenseNotes.map(n => ({ ...n, type: "expense" })),
     ];
 
-    // เรียงตามเวลา
+    // เรียงตามเวลา createdAt หากมี หรือ id (fallback)
     allNotes.sort((a, b) => {
       const aTime = a.createdAt ? new Date(a.createdAt).getTime() : a.id;
       const bTime = b.createdAt ? new Date(b.createdAt).getTime() : b.id;
@@ -330,7 +339,7 @@ router.get("/:id/pdf", async (req, res) => {
     doc.moveDown(1);
     doc.font("thai-bold").fontSize(16).text(` คงเหลือ: ${net.toLocaleString()} บาท`, { align: "right" });
 
-    // ==== ลายเซ็น ====
+    // ==== SIGNATURE ====
     const sigY = doc.page.height - 60;
     doc.fontSize(11).text("...............................................", 40, sigY);
     doc.text("ผู้จัดทำ: " + record.createdBy, 40, sigY + 12);
@@ -342,6 +351,7 @@ router.get("/:id/pdf", async (req, res) => {
     res.status(500).send("เกิดข้อผิดพลาดในการสร้าง PDF");
   }
 });
+
 
 
 // ✅ รายงานสรุปรายเดือน (ตามรูปแบบ cuttingBill)
