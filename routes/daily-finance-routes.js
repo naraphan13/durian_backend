@@ -281,7 +281,11 @@ router.get("/:id/pdf", async (req, res) => {
     const createdDate = new Date();
     const bangkokTime = new Date(createdDate.toLocaleString("en-US", { timeZone: "Asia/Bangkok" }));
 
-    const dateStr = new Date(record.date).toLocaleDateString("th-TH", {
+    const recordDateInBangkok = new Date(
+      new Date(record.date).toLocaleString("en-US", { timeZone: "Asia/Bangkok" })
+    );
+
+    const dateStr = recordDateInBangkok.toLocaleDateString("th-TH", {
       day: "numeric", month: "long", year: "numeric",
     });
     const timeStr = bangkokTime.toLocaleTimeString("th-TH", {
