@@ -294,23 +294,29 @@ router.get("/:id/pdf", async (req, res) => {
     doc.font("thai").fontSize(13).text(`วันที่: ${dateStr} เวลา: ${timeStr} น.`, infoX, topY);
 
     doc.moveDown(2);
-    doc.font("thai-bold").fontSize(17).text("ใบสรุปรายวัน / Daily Financial Report", {
-      align: "center",
-      width: fullWidth,
-    });
+doc.font("thai-bold").fontSize(17).text(
+  "ใบสรุปรายวัน / Daily Financial Report",
+  0,  // x ตำแหน่งเริ่มพิมพ์
+  doc.y, // y ตำแหน่งปัจจุบัน
+  {
+    align: "center",
+    width: fullWidth,
+  }
+);
+
 
     let totalIncome = 0;
     let totalExpense = 0;
 
     doc.moveDown(1);
-    doc.font("thai-bold").fontSize(15).text("☑ รายรับ", 20);
+    doc.font("thai-bold").fontSize(15).text(" รายรับ", 20);
     record.incomeNotes.forEach((item, i) => {
       doc.font("thai").fontSize(14).text(`${i + 1}. ${item.label} - ${item.amount.toLocaleString()} บาท`, 40);
       totalIncome += item.amount;
     });
 
     doc.moveDown(0.5);
-    doc.font("thai-bold").fontSize(15).text("☑ รายจ่าย", 20);
+    doc.font("thai-bold").fontSize(15).text(" รายจ่าย", 20);
     record.expenseNotes.forEach((item, i) => {
       doc.font("thai").fontSize(14).text(`${i + 1}. ${item.label} - ${item.amount.toLocaleString()} บาท`, 40);
       totalExpense += item.amount;
@@ -318,7 +324,7 @@ router.get("/:id/pdf", async (req, res) => {
 
     const net = totalIncome - totalExpense;
     doc.moveDown(1);
-    doc.font("thai-bold").fontSize(16).text(`☑ คงเหลือ: ${net.toLocaleString()} บาท`, { align: "right" });
+    doc.font("thai-bold").fontSize(16).text(` คงเหลือ: ${net.toLocaleString()} บาท`, { align: "right" });
 
     // ==== SIGNATURE ====
     const sigY = doc.page.height - 60;
