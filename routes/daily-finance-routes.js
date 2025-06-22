@@ -291,11 +291,7 @@ router.get("/:id/pdf", async (req, res) => {
     doc.text("เลขที่ 203/2 ม.12 ต.บ้านนา อ.เมืองชุมพร จ.ชุมพร 86190", companyX, topY + 18);
     doc.text("โทร: 081-078-2324 , 082-801-1225 , 095-905-5588", companyX, topY + 36);
 
-    doc.font("thai").fontSize(13).text(
-      `วันที่: ${dateStr} เวลา: ${timeStr} น.`,
-      infoX,
-      topY
-    );
+    doc.font("thai").fontSize(13).text(`วันที่: ${dateStr} เวลา: ${timeStr} น.`, infoX, topY);
 
     doc.moveDown(2);
     doc.font("thai-bold").fontSize(17).text("ใบสรุปรายวัน / Daily Financial Report", {
@@ -306,24 +302,25 @@ router.get("/:id/pdf", async (req, res) => {
     let totalIncome = 0;
     let totalExpense = 0;
 
-    doc.moveDown(0.5);
-    doc.font("thai-bold").fontSize(15).text("📈 รายรับ", 20);
+    doc.moveDown(1);
+    doc.font("thai-bold").fontSize(15).text("☑ รายรับ", 20);
     record.incomeNotes.forEach((item, i) => {
-      doc.font("thai-bold").fontSize(14).text(`${i + 1}. ${item.label} - ${item.amount.toLocaleString()} บาท`, 20);
+      doc.font("thai").fontSize(14).text(`${i + 1}. ${item.label} - ${item.amount.toLocaleString()} บาท`, 40);
       totalIncome += item.amount;
     });
 
-    doc.moveDown(0.4);
-    doc.font("thai-bold").fontSize(15).text("📉 รายจ่าย", 20);
+    doc.moveDown(0.5);
+    doc.font("thai-bold").fontSize(15).text("☑ รายจ่าย", 20);
     record.expenseNotes.forEach((item, i) => {
-      doc.font("thai-bold").fontSize(14).text(`${i + 1}. ${item.label} - ${item.amount.toLocaleString()} บาท`, 20);
+      doc.font("thai").fontSize(14).text(`${i + 1}. ${item.label} - ${item.amount.toLocaleString()} บาท`, 40);
       totalExpense += item.amount;
     });
 
     const net = totalIncome - totalExpense;
-    doc.moveDown(0.5);
-    doc.font("thai-bold").fontSize(16).text(`💰 คงเหลือ: ${net.toLocaleString()} บาท`, { align: "right" });
+    doc.moveDown(1);
+    doc.font("thai-bold").fontSize(16).text(`☑ คงเหลือ: ${net.toLocaleString()} บาท`, { align: "right" });
 
+    // ==== SIGNATURE ====
     const sigY = doc.page.height - 60;
     doc.fontSize(11).text("...............................................", 40, sigY);
     doc.text("ผู้จัดทำ: " + record.createdBy, 40, sigY + 12);
