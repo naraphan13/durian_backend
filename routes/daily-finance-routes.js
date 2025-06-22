@@ -191,4 +191,155 @@ router.patch("/expensenote/:id", async (req, res) => {
   }
 });
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+router.get("/:id/pdf", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const record = await prisma.dailyFinance.findUnique({
+      where: { id },
+      include: {
+        incomeNotes: true,
+        expenseNotes: true,
+      },
+    });
+
+    if (!record) return res.status(404).send("ไม่พบข้อมูล");
+
+    const doc = new PDFDocument();
+    const buffers = [];
+    doc.on("data", buffers.push.bind(buffers));
+    doc.on("end", () => {
+      const pdfData = Buffer.concat(buffers);
+      res.writeHead(200, {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `attachment; filename=daily-${record.date}.pdf`,
+      });
+      res.end(pdfData);
+    });
+
+    doc.fontSize(18).text("📘 รายงานรายวัน", { align: "center" });
+    doc.moveDown();
+    doc.fontSize(14).text(`วันที่: ${new Date(record.date).toLocaleDateString("th-TH")}`);
+    doc.text(`ผู้จัดทำ: ${record.createdBy}`);
+    doc.moveDown();
+
+    doc.fontSize(16).text("📈 รายรับ");
+    let totalIncome = 0;
+    record.incomeNotes.forEach((item, i) => {
+      doc.text(`${i + 1}. ${item.label} - ${item.amount.toLocaleString()} บาท`);
+      totalIncome += item.amount;
+    });
+
+    doc.moveDown();
+    doc.fontSize(16).text("📉 รายจ่าย");
+    let totalExpense = 0;
+    record.expenseNotes.forEach((item, i) => {
+      doc.text(`${i + 1}. ${item.label} - ${item.amount.toLocaleString()} บาท`);
+      totalExpense += item.amount;
+    });
+
+    doc.moveDown();
+    doc.fontSize(14).text(`💰 คงเหลือ: ${(totalIncome - totalExpense).toLocaleString()} บาท`, { align: "right" });
+    doc.end();
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("เกิดข้อผิดพลาดในการสร้าง PDF");
+  }
+});
+
+// ✅ สรุปรายเดือน (PDF)
+router.get("/monthlypdf", async (req, res) => {
+  try {
+    const month = req.query.month; // format YYYY-MM
+    if (!month) return res.status(400).send("ต้องระบุ ?month=YYYY-MM");
+
+    const records = await prisma.dailyFinance.findMany({
+      where: {
+        date: {
+          gte: new Date(`${month}-01`),
+          lt: new Date(`${month}-31`),
+        },
+      },
+      orderBy: { date: "asc" },
+      include: {
+        incomeNotes: true,
+        expenseNotes: true,
+      },
+    });
+
+    const doc = new PDFDocument();
+    const buffers = [];
+    doc.on("data", buffers.push.bind(buffers));
+    doc.on("end", () => {
+      const pdfData = Buffer.concat(buffers);
+      res.writeHead(200, {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `attachment; filename=summary-${month}.pdf`,
+      });
+      res.end(pdfData);
+    });
+
+    doc.fontSize(18).text(`📊 สรุปบันทึกรายเดือน ${month}`, { align: "center" });
+    doc.moveDown();
+
+    let totalIncome = 0;
+    let totalExpense = 0;
+
+    records.forEach((r) => {
+      const income = r.incomeNotes.reduce((sum, n) => sum + n.amount, 0);
+      const expense = r.expenseNotes.reduce((sum, n) => sum + n.amount, 0);
+      totalIncome += income;
+      totalExpense += expense;
+      doc.fontSize(12).text(`📅 ${new Date(r.date).toLocaleDateString("th-TH")}: รายรับ ${income.toLocaleString()} - รายจ่าย ${expense.toLocaleString()} => คงเหลือ ${(income - expense).toLocaleString()} บาท`);
+    });
+
+    doc.moveDown();
+    doc.fontSize(14).text(`รวมรายรับทั้งเดือน: ${totalIncome.toLocaleString()} บาท`);
+    doc.text(`รวมรายจ่ายทั้งเดือน: ${totalExpense.toLocaleString()} บาท`);
+    doc.text(`💰 คงเหลือสุทธิ: ${(totalIncome - totalExpense).toLocaleString()} บาท`, { align: "right" });
+    doc.end();
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("ไม่สามารถสร้างสรุปรายเดือน PDF ได้");
+  }
+});
+
 module.exports = router;
