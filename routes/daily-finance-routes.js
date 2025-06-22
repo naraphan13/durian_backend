@@ -233,6 +233,15 @@ router.patch("/expensenote/:id", async (req, res) => {
 
 
 
+// 📁 routes/dailyfinance-router.js
+const express = require("express");
+const router = express.Router();
+const prisma = require("../models/prisma");
+const PDFDocument = require("pdfkit");
+const fs = require("fs");
+const path = require("path");
+
+// ✅ รายงานรายวัน (PDF พร้อมหัวกระดาษ)
 router.get("/:id/pdf", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
@@ -246,41 +255,90 @@ router.get("/:id/pdf", async (req, res) => {
 
     if (!record) return res.status(404).send("ไม่พบข้อมูล");
 
-    const doc = new PDFDocument();
+    const doc = new PDFDocument({ size: [396, 648], layout: "landscape", margin: 20 });
     const buffers = [];
     doc.on("data", buffers.push.bind(buffers));
     doc.on("end", () => {
       const pdfData = Buffer.concat(buffers);
       res.writeHead(200, {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename=daily-${record.date}.pdf`,
+        "Content-Disposition": `inline; filename=daily-${record.date}.pdf`,
       });
       res.end(pdfData);
     });
 
-    doc.fontSize(18).text("📘 รายงานรายวัน", { align: "center" });
-    doc.moveDown();
-    doc.fontSize(14).text(`วันที่: ${new Date(record.date).toLocaleDateString("th-TH")}`);
-    doc.text(`ผู้จัดทำ: ${record.createdBy}`);
-    doc.moveDown();
+    // ฟอนต์
+    const fontPath = path.join(__dirname, "../fonts/THSarabunNew.ttf");
+    const fontBoldPath = path.join(__dirname, "../fonts/THSarabunNewBold.ttf");
+    if (fs.existsSync(fontPath)) doc.registerFont("thai", fontPath).font("thai");
+    if (fs.existsSync(fontBoldPath)) doc.registerFont("thai-bold", fontBoldPath);
 
-    doc.fontSize(16).text("📈 รายรับ");
+    // ==== HEADER ====
+    const logoPath = path.join(__dirname, "../picture/S__5275654png (1).png");
+    const logoSize = 70;
+    const topY = 20;
+    const logoX = 20;
+    const logoY = topY + 10;
+    const companyX = logoX + logoSize + 15;
+    const infoX = companyX + 250;
+    const fullWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+
+    const createdDate = new Date();
+    const dateStr = new Date(record.date).toLocaleDateString("th-TH", {
+      day: "numeric", month: "long", year: "numeric",
+    });
+
+    const timeStr = createdDate.toLocaleTimeString("th-TH", {
+      hour: "2-digit", minute: "2-digit", hour12: false,
+    });
+
+    if (fs.existsSync(logoPath)) {
+      doc.image(logoPath, logoX, logoY, { fit: [logoSize, logoSize] });
+    }
+
+    doc.font("thai").fontSize(13).text("บริษัท สุริยา388 จำกัด", companyX, topY);
+    doc.text("เลขที่ 203/2 ม.12 ต.บ้านนา อ.เมืองชุมพร จ.ชุมพร 86190", companyX, topY + 18);
+    doc.text("โทร: 081-078-2324 , 082-801-1225 , 095-905-5588", companyX, topY + 36);
+
+    doc.font("thai").fontSize(13).text(
+      `วันที่: ${dateStr} เวลา: ${timeStr} น.`,
+      infoX,
+      topY
+    );
+
+    doc.moveDown(1);
+    doc.font("thai-bold").fontSize(17).text("ใบสรุปรายวัน / Daily Financial Report", {
+      align: "center",
+    });
+
+    // ==== BODY ====
     let totalIncome = 0;
+    let totalExpense = 0;
+
+    doc.moveDown(1);
+    doc.font("thai-bold").fontSize(15).text("📈 รายรับ", 20);
     record.incomeNotes.forEach((item, i) => {
-      doc.text(`${i + 1}. ${item.label} - ${item.amount.toLocaleString()} บาท`);
+      doc.font("thai").fontSize(14).text(`${i + 1}. ${item.label} - ${item.amount.toLocaleString()} บาท`, 30);
       totalIncome += item.amount;
     });
 
-    doc.moveDown();
-    doc.fontSize(16).text("📉 รายจ่าย");
-    let totalExpense = 0;
+    doc.moveDown(0.5);
+    doc.font("thai-bold").fontSize(15).text("📉 รายจ่าย", 20);
     record.expenseNotes.forEach((item, i) => {
-      doc.text(`${i + 1}. ${item.label} - ${item.amount.toLocaleString()} บาท`);
+      doc.font("thai").fontSize(14).text(`${i + 1}. ${item.label} - ${item.amount.toLocaleString()} บาท`, 30);
       totalExpense += item.amount;
     });
 
-    doc.moveDown();
-    doc.fontSize(14).text(`💰 คงเหลือ: ${(totalIncome - totalExpense).toLocaleString()} บาท`, { align: "right" });
+    const net = totalIncome - totalExpense;
+    doc.moveDown(1);
+    doc.font("thai-bold").fontSize(16).text(`💰 คงเหลือ: ${net.toLocaleString()} บาท`, { align: "right" });
+
+    // ==== SIGNATURE ====
+    const sigY = doc.page.height - 60;
+    doc.fontSize(11).text("...............................................", 40, sigY);
+    doc.text("ผู้จัดทำ: " + record.createdBy, 40, sigY + 12);
+    doc.text("ลงวันที่: ........../........../..........", 40, sigY + 24);
+
     doc.end();
   } catch (err) {
     console.error(err);
@@ -288,7 +346,7 @@ router.get("/:id/pdf", async (req, res) => {
   }
 });
 
-// ✅ สรุปรายเดือน (PDF)
+// ✅ รายงานสรุปรายเดือน
 router.get("/monthlypdf", async (req, res) => {
   try {
     const month = req.query.month; // format YYYY-MM
@@ -297,8 +355,8 @@ router.get("/monthlypdf", async (req, res) => {
     const records = await prisma.dailyFinance.findMany({
       where: {
         date: {
-          gte: new Date(`${month}-01`),
-          lt: new Date(`${month}-31`),
+          gte: new Date(`${month}-01T00:00:00.000Z`),
+          lt: new Date(`${month}-31T23:59:59.999Z`),
         },
       },
       orderBy: { date: "asc" },
@@ -319,6 +377,10 @@ router.get("/monthlypdf", async (req, res) => {
       });
       res.end(pdfData);
     });
+
+    // ฟอนต์
+    const fontPath = path.join(__dirname, "../fonts/THSarabunNew.ttf");
+    if (fs.existsSync(fontPath)) doc.registerFont("thai", fontPath).font("thai");
 
     doc.fontSize(18).text(`📊 สรุปบันทึกรายเดือน ${month}`, { align: "center" });
     doc.moveDown();
@@ -346,3 +408,6 @@ router.get("/monthlypdf", async (req, res) => {
 });
 
 module.exports = router;
+
+
+
