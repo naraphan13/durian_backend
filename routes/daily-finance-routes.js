@@ -319,7 +319,7 @@ router.get("/:id/pdf", async (req, res) => {
 
     doc.moveDown(1);
     allNotes.forEach((item, i) => {
-      const prefix = item.type === "income" ? "📈" : "📉";
+      const prefix = item.type === "income" ? "รายรับ" : "รายจ่าย";
       const line = `${i + 1}. ${item.label} - ${item.amount.toLocaleString()} บาท`;
       doc.font("thai").fontSize(14).text(`${prefix} ${line}`, 40);
       if (item.type === "income") totalIncome += item.amount;
@@ -328,7 +328,7 @@ router.get("/:id/pdf", async (req, res) => {
 
     const net = totalIncome - totalExpense;
     doc.moveDown(1);
-    doc.font("thai-bold").fontSize(16).text(`☑ คงเหลือ: ${net.toLocaleString()} บาท`, { align: "right" });
+    doc.font("thai-bold").fontSize(16).text(` คงเหลือ: ${net.toLocaleString()} บาท`, { align: "right" });
 
     // ==== ลายเซ็น ====
     const sigY = doc.page.height - 60;
