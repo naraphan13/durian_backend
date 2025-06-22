@@ -294,39 +294,43 @@ router.get("/:id/pdf", async (req, res) => {
     doc.font("thai").fontSize(13).text(`วันที่: ${dateStr} เวลา: ${timeStr} น.`, infoX, topY);
 
     doc.moveDown(2);
-doc.font("thai-bold").fontSize(17).text(
-  "ใบสรุปรายวัน / Daily Financial Report",
-  0,  // x ตำแหน่งเริ่มพิมพ์
-  doc.y, // y ตำแหน่งปัจจุบัน
-  {
-    align: "center",
-    width: fullWidth,
-  }
-);
+    doc.font("thai-bold").fontSize(17).text(
+      "ใบสรุปรายวัน / Daily Financial Report",
+      0,
+      doc.y,
+      { align: "center", width: fullWidth }
+    );
 
+    // รวมรายรับ/รายจ่ายเป็นหนึ่งลิสต์
+    const allNotes = [
+      ...record.incomeNotes.map(n => ({ ...n, type: "income" })),
+      ...record.expenseNotes.map(n => ({ ...n, type: "expense" })),
+    ];
+
+    // เรียงตามเวลา
+    allNotes.sort((a, b) => {
+      const aTime = a.createdAt ? new Date(a.createdAt).getTime() : a.id;
+      const bTime = b.createdAt ? new Date(b.createdAt).getTime() : b.id;
+      return aTime - bTime;
+    });
 
     let totalIncome = 0;
     let totalExpense = 0;
 
     doc.moveDown(1);
-    doc.font("thai-bold").fontSize(15).text(" รายรับ", 20);
-    record.incomeNotes.forEach((item, i) => {
-      doc.font("thai").fontSize(14).text(`${i + 1}. ${item.label} - ${item.amount.toLocaleString()} บาท`, 40);
-      totalIncome += item.amount;
-    });
-
-    doc.moveDown(0.5);
-    doc.font("thai-bold").fontSize(15).text(" รายจ่าย", 20);
-    record.expenseNotes.forEach((item, i) => {
-      doc.font("thai").fontSize(14).text(`${i + 1}. ${item.label} - ${item.amount.toLocaleString()} บาท`, 40);
-      totalExpense += item.amount;
+    allNotes.forEach((item, i) => {
+      const prefix = item.type === "income" ? "📈" : "📉";
+      const line = `${i + 1}. ${item.label} - ${item.amount.toLocaleString()} บาท`;
+      doc.font("thai").fontSize(14).text(`${prefix} ${line}`, 40);
+      if (item.type === "income") totalIncome += item.amount;
+      else totalExpense += item.amount;
     });
 
     const net = totalIncome - totalExpense;
     doc.moveDown(1);
-    doc.font("thai-bold").fontSize(16).text(` คงเหลือ: ${net.toLocaleString()} บาท`, { align: "right" });
+    doc.font("thai-bold").fontSize(16).text(`☑ คงเหลือ: ${net.toLocaleString()} บาท`, { align: "right" });
 
-    // ==== SIGNATURE ====
+    // ==== ลายเซ็น ====
     const sigY = doc.page.height - 60;
     doc.fontSize(11).text("...............................................", 40, sigY);
     doc.text("ผู้จัดทำ: " + record.createdBy, 40, sigY + 12);
@@ -338,6 +342,7 @@ doc.font("thai-bold").fontSize(17).text(
     res.status(500).send("เกิดข้อผิดพลาดในการสร้าง PDF");
   }
 });
+
 
 // ✅ รายงานสรุปรายเดือน (ตามรูปแบบ cuttingBill)
 router.get("/monthlypdf", async (req, res) => {
