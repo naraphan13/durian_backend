@@ -39,6 +39,7 @@ model Season {
   endDate         DateTime? // ✅ ยังไม่รู้วันปิดก็ใส่ null ได้
   bills           Bill[] // ✅ Relation กลับไปยัง Bill
   ExportContainer ExportContainer[]
+  invoices        Invoice[]
 }
 
 model Item {
@@ -242,4 +243,81 @@ model ExpenseNote {
   amount         Float
   dailyFinance   DailyFinance  @relation(fields: [dailyFinanceId], references: [id], onDelete: Cascade)
   dailyFinanceId Int
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+model Invoice {
+  id            Int      @id @default(autoincrement())
+  date          DateTime
+  destination   String?      // ปลายทาง
+  containerInfo String?      // ข้อมูลตู้
+  containerCode String?      // รหัสตู้
+  refCode       String?      // รหัสอ้างอิง
+
+  invoiceNo     Int      @default(1)   // #1
+  rate          Float?                 // เช่น 12 (ถ้าใช้คำนวณ)
+
+  billToName    String?
+  billToAddress String?   @db.Text
+  billToTaxId   String?
+
+  companyName   String?   @default("SURIYA 388 CO.,LTD.")
+  companyAddress String?  @db.Text
+  companyTaxId  String?
+  companyPhone  String?
+
+  note          String?   @db.Text
+
+  items         InvoiceItem[]
+  freightItems  InvoiceFreightItem[]
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  seasonId      Int?
+  season        Season?  @relation(fields: [seasonId], references: [id])
+}
+
+model InvoiceItem {
+  id         Int     @id @default(autoincrement())
+  invoiceId  Int
+  invoice    Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  brand      String?     // DA TAI / LUO LAN QING
+  variety    String?
+  grade      String?
+  boxes      Float?
+  weightPerBox Float?
+  pricePerKg Float?      // ถ้าไม่ใช้เรท ให้ใช้ราคานี้
+}
+
+model InvoiceFreightItem {
+  id         Int     @id @default(autoincrement())
+  invoiceId  Int
+  invoice    Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  variety    String?
+  grade      String?
+  weight     Float?
+  pricePerKg Float?
 }
