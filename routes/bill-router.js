@@ -323,13 +323,10 @@ router.get("/:id/pdf", async (req, res) => {
 
     // ✅ เพิ่ม "รวมน้ำหนัก" ก่อน "รวมเงิน"
     doc.moveDown(0.5);
-    doc.font("thai-bold").fontSize(17).text(
-      `รวมน้ำหนัก: ${totalWeightAll.toLocaleString()} กก.`,
-      { align: "center" }
-    );
+    
 
     doc.font("thai-bold").fontSize(17).text(
-      `รวมเงิน: ${totalMoneyAll.toLocaleString()} บาท`,
+      `รวมน้ำหนัก: ${totalWeightAll.toLocaleString()} กก.          รวมเงิน: ${totalMoneyAll.toLocaleString()} บาท`,
       { align: "center" }
     );
 
