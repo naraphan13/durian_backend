@@ -187,7 +187,7 @@ function buildInvoicePDF(res, invoice) {
   const companyTaxId = invoice.companyTaxId || "";
   const companyPhone = invoice.companyPhone || "";
 
-  setFont(companyName, true).fontSize(18).fillColor("#000000");
+  setFont(companyName, true).fontSize(16).fillColor("#000000");
   doc.text(companyName, left + 95, top + 12, { width: 300 });
 
   setFont(companyAddress, false).fontSize(12).fillColor("#000000");
