@@ -268,67 +268,96 @@ model ExpenseNote {
 
 model Invoice {
   id            Int      @id @default(autoincrement())
-  date          DateTime
+
+  // ===== ของเดิม (อย่าลบ เพื่อไม่ให้ข้อมูลเก่าหาย) =====
+  date          DateTime @default(now())
+  rate          Float?
 
   destination   String?
-  containerInfo String?
+  containerInfo String?   @db.Text
   containerCode String?
   refCode       String?
 
   invoiceNo     Int      @default(1)
-  rate          Float?
 
   billToName    String?
   billToAddress String?   @db.Text
   billToTaxId   String?
 
-  companyName    String?   @default("SURIYA 388 CO.,LTD.")
-  companyAddress String?   @db.Text
+  companyName    String?  @default("SURIYA 388 CO.,LTD.")
+  companyAddress String?  @db.Text
   companyTaxId   String?
   companyPhone   String?
 
-  // ✅ เพิ่มโลโก้
-  companyLogoKey String?
-  companyLogoB64 String?  @db.LongText
+  companyLogoKey String?  // "logo1" | "logo2"
 
   note          String?   @db.Text
 
-  items         InvoiceItem[]
-  freightItems  InvoiceFreightItem[]
+  // ===== ใบจริง 100% (เพิ่มใหม่ แต่ให้เป็น optional ก่อน) =====
+  shipDate      DateTime?           // ✅ เพิ่มแบบ nullable ก่อน กัน db push พัง
+  route         String?             // 陆运/海运
+  temperature   String?             // 温度/อุณหภูมิ
+  transport     String?             // 铁路/รถไฟ : WMK
+  brandRemark   String?             // DATAI + LUO LAN QING + 恭喜发财
 
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  // snapshot totals (optional ก่อน)
+  totalBoxes        Float? @default(0)
+  totalWeightKg     Float? @default(0)
+  subtotalAmount    Float? @default(0)
+  expenseAmount     Float? @default(0)
+  grandTotalAmount  Float? @default(0)
+  amountText        String? @db.Text
 
-  seasonId      Int?
-  season        Season?  @relation(fields: [seasonId], references: [id])
+  items        InvoiceItem[]
+  // ถ้ายังไม่มี expenses ใน backend ตอนนี้ จะยังไม่ต้องใส่ก็ได้
+  expenses     InvoiceExpense[]
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  seasonId     Int?
+  season       Season?  @relation(fields: [seasonId], references: [id])
 
   @@index([date])
+  @@index([shipDate])
   @@index([seasonId])
   @@index([containerCode])
   @@index([refCode])
 }
 
-
 model InvoiceItem {
-  id         Int     @id @default(autoincrement())
-  invoiceId  Int
-  invoice    Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  id            Int     @id @default(autoincrement())
+  invoiceId     Int
+  invoice       Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 
-  brand      String?     // DA TAI / LUO LAN QING
-  variety    String?
-  grade      String?
-  boxes      Float?
-  weightPerBox Float?
-  pricePerKg Float?      // ถ้าไม่ใช้เรท ให้ใช้ราคานี้
+  // ===== ของเดิม (อย่าลบ) =====
+  brand         String?
+  variety       String?
+  grade         String?
+  boxes         Float?
+  weightPerBox  Float?
+  pricePerKg    Float?      // ✅ ของเดิมไว้ก่อน
+
+  // ===== ใบจริง 100% (เพิ่มใหม่ optional) =====
+  purchaseDate  DateTime?   // วันที่ซื้อของ
+  boxSize       String?     // S/L/XL
+
+  // snapshot ต่อแถว (optional)
+  weightTotalKg Float? @default(0)
+  unitPrice     Float? @default(0)
+  amount        Float? @default(0)
+
+  @@index([invoiceId])
+  @@index([brand])
 }
 
-model InvoiceFreightItem {
-  id         Int     @id @default(autoincrement())
-  invoiceId  Int
-  invoice    Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+model InvoiceExpense {
+  id        Int     @id @default(autoincrement())
+  invoiceId Int
+  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 
-  variety    String?
-  grade      String?
-  weight     Float?
-  pricePerKg Float?
+  label     String
+  amount    Float  @default(0)
+
+  @@index([invoiceId])
 }
