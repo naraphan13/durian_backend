@@ -257,20 +257,22 @@ router.get("/:id/pdf", async (req, res) => {
     const companyX = logoX + logoSize + 15;
     const billInfoX = companyX + 250;
 
-    const utcDate = new Date(bill.date);
-    const bangkokDate = new Date(utcDate.getTime() + 7 * 60 * 60 * 1000);
+    // ✅ ใช้ timeZone Asia/Bangkok (ไม่ต้อง +7 เอง)
+    const billDate = new Date(bill.date);
 
     const dateStr = new Intl.DateTimeFormat("th-TH", {
+      timeZone: "Asia/Bangkok",
       year: "numeric",
       month: "long",
       day: "numeric",
-    }).format(bangkokDate);
+    }).format(billDate);
 
     const timeStr = new Intl.DateTimeFormat("th-TH", {
+      timeZone: "Asia/Bangkok",
       hour: "2-digit",
       minute: "2-digit",
       hour12: false,
-    }).format(bangkokDate);
+    }).format(billDate);
 
     if (fs.existsSync(logoPath)) {
       doc.image(logoPath, logoX, logoY, { fit: [logoSize, logoSize] });
@@ -285,7 +287,11 @@ router.get("/:id/pdf", async (req, res) => {
       billInfoX,
       topY
     );
-    doc.text(`โดย: ___ เงินสด   ___ โอนผ่านบัญชีธนาคาร   เพื่อชำระ: ค่าทุเรียน`, billInfoX, topY + 18);
+    doc.text(
+      `โดย: ___ เงินสด   ___ โอนผ่านบัญชีธนาคาร   เพื่อชำระ: ค่าทุเรียน`,
+      billInfoX,
+      topY + 18
+    );
     doc.text(`วันที่: ${dateStr} เวลา: ${timeStr} น.`, billInfoX, topY + 36);
 
     // ==== TITLE ====
@@ -299,24 +305,33 @@ router.get("/:id/pdf", async (req, res) => {
     doc.moveDown(0.5);
     doc.font("thai-bold").fontSize(17).text("รายการที่ซื้อ:", 20);
 
-    const summaryByVarietyGrade = {};
+    // ✅ รวมนน.ทั้งหมด + รวมเงินทั้งหมด
+    let totalWeightAll = 0;
+    let totalMoneyAll = 0;
+
     bill.items.forEach((item, i) => {
-      const totalWeight = item.weight;
-      const subtotal = item.weight * item.pricePerKg;
+      const w = Number(item.weight || 0);
+      const p = Number(item.pricePerKg || 0);
+      const subtotal = w * p;
 
-      const line = `${i + 1}. ${item.variety} เกรด ${item.grade} | น้ำหนัก: ${totalWeight} กก. x ${item.pricePerKg} บาท = ${subtotal.toLocaleString()} บาท`;
+      totalWeightAll += w;
+      totalMoneyAll += subtotal;
+
+      const line = `${i + 1}. ${item.variety} เกรด ${item.grade} | น้ำหนัก: ${w} กก. x ${p} บาท = ${subtotal.toLocaleString()} บาท`;
       doc.font("thai-bold").fontSize(17).text(line, 20);
-
-      const key = `${item.variety} ${item.grade}`;
-      if (!summaryByVarietyGrade[key]) summaryByVarietyGrade[key] = 0;
-      summaryByVarietyGrade[key] += subtotal;
     });
 
-    const total = Object.values(summaryByVarietyGrade).reduce((sum, val) => sum + val, 0);
+    // ✅ เพิ่ม "รวมน้ำหนัก" ก่อน "รวมเงิน"
     doc.moveDown(0.5);
-    doc.font("thai-bold").fontSize(17).text(`รวมเงิน: ${total.toLocaleString()} บาท`, {
-      align: "center",
-    });
+    doc.font("thai-bold").fontSize(17).text(
+      `รวมน้ำหนัก: ${totalWeightAll.toLocaleString()} กก.`,
+      { align: "center" }
+    );
+
+    doc.font("thai-bold").fontSize(17).text(
+      `รวมเงิน: ${totalMoneyAll.toLocaleString()} บาท`,
+      { align: "center" }
+    );
 
     // ==== ลายเซ็น ====
     const signatureBaseY = doc.page.height - 60;
@@ -335,6 +350,7 @@ router.get("/:id/pdf", async (req, res) => {
     res.status(500).send("เกิดข้อผิดพลาด");
   }
 });
+
 
 
 
