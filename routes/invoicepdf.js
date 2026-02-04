@@ -2,13 +2,11 @@
 // ✅ Router ใหม่ “Invoice” แยกจาก ExportContainer 100%
 // ✅ CRUD + Generate PDF
 // ✅ รองรับ Prisma schema (Invoice + InvoiceItem + InvoiceFreightItem + seasonId)
-// ✅ รองรับโลโก้ 2 แบบ:
-//    1) preset โดยใช้ companyLogoKey (logo1/logo2/logo3)
-//    2) อัปโหลดเป็น base64 dataURL เก็บใน DB (companyLogoB64)
-// ✅ แก้ปัญหา “ภาษาไทย/จีนเป็นต่างดาว” ด้วยการใช้ 2 ฟอนต์ + เลือกฟอนต์ตามข้อความ (Smart Font Switch)
-//    - ไทย: THSarabunNew.ttf / THSarabunNewBold.ttf
-//    - จีน: NotoSansSC-Regular.ttf / NotoSansSC-Bold.ttf
-// ✅ PDF: ตารางมี “ราคา + รวมเงิน” แน่นอน และคอลัมน์ไม่หลุดหน้า A4
+// ✅ รองรับโลโก้แบบ preset ด้วย companyLogoKey (logo1/logo2/logo3)
+// ✅ แก้ปัญหา “ไทย/จีนเป็นต่างดาว” แบบถาวร: วาดข้อความแบบ “ตัดเป็นช่วง (runs)” แล้วสลับฟอนต์ในบรรทัดเดียว
+//    - ไทย: ../fonts/THSarabunNew.ttf / ../fonts/THSarabunNewBold.ttf
+//    - จีน: ../fonts/NotoSansSC-Regular.ttf / ../fonts/NotoSansSC-Bold.ttf
+// ✅ PDF: ตารางมี “ราคา + รวมเงิน” และคอลัมน์ไม่หลุดหน้า A4
 // ✅ Endpoint:
 //    POST   /v1/invoices
 //    GET    /v1/invoices?seasonId=...
@@ -39,16 +37,6 @@ function thDate(d) {
 function toDateOnly(d) {
   const dt = new Date(d);
   return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate());
-}
-function parseDataUrlToBuffer(dataUrl) {
-  // data:image/png;base64,xxxx
-  const parts = String(dataUrl || "").split(",");
-  if (parts.length < 2) return null;
-  return Buffer.from(parts[1], "base64");
-}
-function hasCJK(text) {
-  // Chinese/Japanese/Korean ranges
-  return /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/.test(String(text || ""));
 }
 
 /* ----------------------------- fonts ----------------------------- */
@@ -85,27 +73,201 @@ function registerFonts(doc) {
 
   // default to Thai if available
   if (loaded.th.regular) doc.font("th");
+  else if (loaded.zh.regular) doc.font("zh");
+
   return loaded;
 }
 
-function setFontSmart(doc, fontsLoaded, text, bold = false) {
-  const useZh = hasCJK(text);
+function isCJKChar(ch) {
+  // Chinese/Japanese/Korean ranges
+  return /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/.test(ch);
+}
+function isThaiChar(ch) {
+  return /[\u0E00-\u0E7F]/.test(ch);
+}
+function splitRunsByScript(text) {
+  const s = String(text ?? "");
+  if (!s) return [];
 
-  if (useZh) {
+  const getType = (ch) => {
+    if (isThaiChar(ch)) return "th";
+    if (isCJKChar(ch)) return "zh";
+    return "other";
+  };
+
+  let runs = [];
+  let curType = getType(s[0]);
+  let buf = s[0];
+
+  for (let i = 1; i < s.length; i++) {
+    const t = getType(s[i]);
+    if (t === curType) {
+      buf += s[i];
+    } else {
+      runs.push({ type: curType, text: buf });
+      curType = t;
+      buf = s[i];
+    }
+  }
+  runs.push({ type: curType, text: buf });
+  return runs;
+}
+
+function useFont(doc, fontsLoaded, runType, bold) {
+  if (runType === "zh") {
     if (bold && fontsLoaded.zh.bold) return doc.font("zh-bold");
     if (fontsLoaded.zh.regular) return doc.font("zh");
-    // fallback to Thai if zh missing
     if (bold && fontsLoaded.th.bold) return doc.font("th-bold");
     if (fontsLoaded.th.regular) return doc.font("th");
-    return doc;
-  } else {
-    if (bold && fontsLoaded.th.bold) return doc.font("th-bold");
-    if (fontsLoaded.th.regular) return doc.font("th");
-    // fallback to zh if th missing
-    if (bold && fontsLoaded.zh.bold) return doc.font("zh-bold");
-    if (fontsLoaded.zh.regular) return doc.font("zh");
     return doc;
   }
+
+  // th or other => prefer Thai
+  if (bold && fontsLoaded.th.bold) return doc.font("th-bold");
+  if (fontsLoaded.th.regular) return doc.font("th");
+  if (bold && fontsLoaded.zh.bold) return doc.font("zh-bold");
+  if (fontsLoaded.zh.regular) return doc.font("zh");
+  return doc;
+}
+
+function measureMixedTextWidth(doc, fontsLoaded, text, fontSize = 12, bold = false) {
+  const runs = splitRunsByScript(text);
+  let w = 0;
+  for (const r of runs) {
+    useFont(doc, fontsLoaded, r.type, bold);
+    doc.fontSize(fontSize);
+    w += doc.widthOfString(r.text || "");
+  }
+  return w;
+}
+
+function fitMixedTextToWidth(doc, fontsLoaded, text, width, fontSize = 12, bold = false) {
+  const s = String(text ?? "");
+  if (!s) return "";
+
+  // ถ้าพอดีแล้ว ไม่ต้องตัด
+  const fullW = measureMixedTextWidth(doc, fontsLoaded, s, fontSize, bold);
+  if (fullW <= width) return s;
+
+  const ellipsis = "…";
+  const ellW = measureMixedTextWidth(doc, fontsLoaded, ellipsis, fontSize, bold);
+  const target = Math.max(0, width - ellW);
+
+  // ตัดแบบต่อ char (ปลอดภัยสุด)
+  const runs = splitRunsByScript(s);
+  const chars = [];
+  runs.forEach((r) => {
+    for (const ch of r.text) chars.push({ type: r.type, ch });
+  });
+
+  let out = "";
+  let acc = 0;
+
+  for (const t of chars) {
+    useFont(doc, fontsLoaded, t.type, bold);
+    doc.fontSize(fontSize);
+    const cw = doc.widthOfString(t.ch);
+    if (acc + cw > target) break;
+    out += t.ch;
+    acc += cw;
+  }
+
+  return out ? out + ellipsis : ellipsis;
+}
+
+/**
+ * วาดข้อความผสม ไทย/จีน ได้ใน “บรรทัดเดียวกัน” โดยไม่ทำให้ไทยเพี้ยน
+ * - รองรับ align: left/right/center
+ * - รองรับ width + wrap (ใช้กับ note/address ได้)
+ */
+function drawMixedText(doc, fontsLoaded, text, x, y, opts = {}) {
+  const {
+    width = 9999,
+    align = "left",
+    fontSize = 12,
+    bold = false,
+    lineGap = 2,
+    wrap = true,
+  } = opts;
+
+  const s = String(text ?? "");
+  if (!s) return y;
+
+  const runs = splitRunsByScript(s);
+
+  // token per char (เพื่อ wrap ที่แน่นอน)
+  const tokens = [];
+  runs.forEach((r) => {
+    for (const ch of r.text) tokens.push({ type: r.type, ch });
+  });
+
+  const measureChar = (t) => {
+    useFont(doc, fontsLoaded, t.type, bold);
+    doc.fontSize(fontSize);
+    return doc.widthOfString(t.ch);
+  };
+
+  // ถ้าไม่ wrap: วาดบรรทัดเดียว (ผู้เรียกควร fit มาก่อน)
+  if (!wrap) {
+    // หา width ของบรรทัด
+    let wSum = 0;
+    tokens.forEach((t) => (wSum += measureChar(t)));
+
+    let startX = x;
+    if (align === "right") startX = x + width - wSum;
+    if (align === "center") startX = x + (width - wSum) / 2;
+
+    let cx = startX;
+    tokens.forEach((t) => {
+      useFont(doc, fontsLoaded, t.type, bold);
+      doc.fontSize(fontSize);
+      doc.text(t.ch, cx, y, { lineBreak: false });
+      cx += doc.widthOfString(t.ch);
+    });
+
+    return y;
+  }
+
+  // wrap mode
+  const lines = [];
+  let line = [];
+  let lineW = 0;
+
+  tokens.forEach((t) => {
+    const w = measureChar(t);
+    if (lineW + w > width && line.length > 0) {
+      lines.push(line);
+      line = [t];
+      lineW = w;
+    } else {
+      line.push(t);
+      lineW += w;
+    }
+  });
+  if (line.length) lines.push(line);
+
+  let cy = y;
+
+  lines.forEach((ln) => {
+    let wSum = 0;
+    ln.forEach((t) => (wSum += measureChar(t)));
+
+    let startX = x;
+    if (align === "right") startX = x + width - wSum;
+    if (align === "center") startX = x + (width - wSum) / 2;
+
+    let cx = startX;
+    ln.forEach((t) => {
+      useFont(doc, fontsLoaded, t.type, bold);
+      doc.fontSize(fontSize);
+      doc.text(t.ch, cx, cy, { lineBreak: false });
+      cx += doc.widthOfString(t.ch);
+    });
+
+    cy += doc.currentLineHeight() + lineGap;
+  });
+
+  return cy;
 }
 
 /* ----------------------------- PDF maker ----------------------------- */
@@ -125,10 +287,6 @@ function buildInvoicePDF(res, invoice) {
   });
 
   const fontsLoaded = registerFonts(doc);
-  const setFont = (text = "", bold = false) => {
-    setFontSmart(doc, fontsLoaded, text, bold);
-    return doc;
-  };
 
   // layout constants
   const pageW = doc.page.width;
@@ -144,7 +302,7 @@ function buildInvoicePDF(res, invoice) {
   const headerH = 120;
   doc.roundedRect(left, top, right - left, headerH, 10).lineWidth(1).stroke("#cccccc");
 
-  // --- logo: base64 > preset > default
+  // --- logo preset
   const logoPresets = {
     logo1: path.join(__dirname, "../picture/S__5275654png (1).png"),
     logo2: path.join(__dirname, "../picture/dos.png"),
@@ -154,21 +312,7 @@ function buildInvoicePDF(res, invoice) {
 
   let logoDrawn = false;
 
-  // 1) base64
-  if (invoice.companyLogoB64 && String(invoice.companyLogoB64).includes("base64")) {
-    try {
-      const buf = parseDataUrlToBuffer(invoice.companyLogoB64);
-      if (buf) {
-        doc.image(buf, left + 12, top + 12, { width: 70 });
-        logoDrawn = true;
-      }
-    } catch (e) {
-      logoDrawn = false;
-    }
-  }
-
-  // 2) preset
-  if (!logoDrawn && invoice.companyLogoKey && logoPresets[invoice.companyLogoKey]) {
+  if (invoice.companyLogoKey && logoPresets[invoice.companyLogoKey]) {
     const p = logoPresets[invoice.companyLogoKey];
     if (fs.existsSync(p)) {
       doc.image(p, left + 12, top + 12, { width: 70 });
@@ -176,7 +320,6 @@ function buildInvoicePDF(res, invoice) {
     }
   }
 
-  // 3) default
   if (!logoDrawn && fs.existsSync(defaultLogo)) {
     doc.image(defaultLogo, left + 12, top + 12, { width: 70 });
   }
@@ -187,59 +330,105 @@ function buildInvoicePDF(res, invoice) {
   const companyTaxId = invoice.companyTaxId || "";
   const companyPhone = invoice.companyPhone || "";
 
-  setFont(companyName, true).fontSize(16).fillColor("#000000");
-  doc.text(companyName, left + 95, top + 12, { width: 300 });
+  doc.fillColor("#000000");
+  drawMixedText(doc, fontsLoaded, companyName, left + 95, top + 12, {
+    width: 320,
+    fontSize: 18,
+    bold: true,
+    wrap: true,
+  });
 
-  setFont(companyAddress, false).fontSize(12).fillColor("#000000");
-  doc.text(companyAddress, left + 95, top + 36, { width: 300 });
+  drawMixedText(doc, fontsLoaded, companyAddress, left + 95, top + 36, {
+    width: 320,
+    fontSize: 12,
+    bold: false,
+    wrap: true,
+    lineGap: 1,
+  });
 
   if (companyTaxId) {
     const t = `เลขประจำตัวผู้เสียภาษี: ${companyTaxId}`;
-    setFont(t, false).fontSize(12);
-    doc.text(t, left + 95, top + 70, { width: 300 });
+    drawMixedText(doc, fontsLoaded, t, left + 95, top + 70, {
+      width: 320,
+      fontSize: 12,
+      wrap: false,
+    });
   }
   if (companyPhone) {
     const t = `Tel: ${companyPhone}`;
-    setFont(t, false).fontSize(12);
-    doc.text(t, left + 95, top + 88, { width: 300 });
+    drawMixedText(doc, fontsLoaded, t, left + 95, top + 88, {
+      width: 320,
+      fontSize: 12,
+      wrap: false,
+    });
   }
 
   // INVOICE info (right)
-  setFont("INVOICE", true).fontSize(24).fillColor(red);
-  doc.text("INVOICE", right - 170, top + 12, { width: 170, align: "right" });
+  doc.fillColor(red);
+  drawMixedText(doc, fontsLoaded, "INVOICE", right - 170, top + 12, {
+    width: 170,
+    align: "right",
+    fontSize: 24,
+    bold: true,
+    wrap: false,
+  });
 
+  doc.fillColor("#000");
   const line1 = `DATE: ${thDate(invoice.date)}`;
   const line2 = `NO: #${invoice.invoiceNo || 1}`;
-  setFont(line1, false).fontSize(12).fillColor("#000");
-  doc.text(line1, right - 220, top + 48, { width: 220, align: "right" });
 
-  setFont(line2, false).fontSize(12).fillColor("#000");
-  doc.text(line2, right - 220, top + 66, { width: 220, align: "right" });
+  drawMixedText(doc, fontsLoaded, line1, right - 220, top + 48, {
+    width: 220,
+    align: "right",
+    fontSize: 12,
+    wrap: false,
+  });
+  drawMixedText(doc, fontsLoaded, line2, right - 220, top + 66, {
+    width: 220,
+    align: "right",
+    fontSize: 12,
+    wrap: false,
+  });
 
   // --- Bill to + meta
   const sectionY = top + headerH + 16;
 
   // Bill To box
   doc.roundedRect(left, sectionY, (right - left) * 0.55 - 6, 100, 10).lineWidth(1).stroke("#cccccc");
-  setFont("BILL TO", true).fontSize(14).fillColor("#000");
-  doc.text("BILL TO", left + 12, sectionY + 10);
+  doc.fillColor("#000");
+  drawMixedText(doc, fontsLoaded, "BILL TO", left + 12, sectionY + 10, {
+    width: (right - left) * 0.55 - 30,
+    fontSize: 14,
+    bold: true,
+    wrap: false,
+  });
 
   const billToName = invoice.billToName || "-";
   const billToTaxId = invoice.billToTaxId || "";
   const billToAddress = invoice.billToAddress || "";
 
-  setFont(billToName, false).fontSize(12).fillColor("#000");
-  doc.text(billToName, left + 12, sectionY + 32, { width: (right - left) * 0.55 - 30 });
+  drawMixedText(doc, fontsLoaded, billToName, left + 12, sectionY + 32, {
+    width: (right - left) * 0.55 - 30,
+    fontSize: 12,
+    wrap: false,
+  });
 
   if (billToTaxId) {
     const t = `Tax ID: ${billToTaxId}`;
-    setFont(t, false).fontSize(12);
-    doc.text(t, left + 12, sectionY + 50, { width: (right - left) * 0.55 - 30 });
+    drawMixedText(doc, fontsLoaded, t, left + 12, sectionY + 50, {
+      width: (right - left) * 0.55 - 30,
+      fontSize: 12,
+      wrap: false,
+    });
   }
 
   if (billToAddress) {
-    setFont(billToAddress, false).fontSize(12);
-    doc.text(billToAddress, left + 12, sectionY + 68, { width: (right - left) * 0.55 - 30 });
+    drawMixedText(doc, fontsLoaded, billToAddress, left + 12, sectionY + 68, {
+      width: (right - left) * 0.55 - 30,
+      fontSize: 12,
+      wrap: true,
+      lineGap: 1,
+    });
   }
 
   // Meta box
@@ -247,8 +436,12 @@ function buildInvoicePDF(res, invoice) {
   const metaW = right - metaX;
   doc.roundedRect(metaX, sectionY, metaW, 100, 10).lineWidth(1).stroke("#cccccc");
 
-  setFont("DETAIL", true).fontSize(14);
-  doc.text("DETAIL", metaX + 12, sectionY + 10);
+  drawMixedText(doc, fontsLoaded, "DETAIL", metaX + 12, sectionY + 10, {
+    width: metaW - 24,
+    fontSize: 14,
+    bold: true,
+    wrap: false,
+  });
 
   const metaLines = [
     `Destination: ${invoice.destination || "-"}`,
@@ -259,8 +452,11 @@ function buildInvoicePDF(res, invoice) {
 
   let yy = sectionY + 32;
   metaLines.forEach((t) => {
-    setFont(t, false).fontSize(12);
-    doc.text(t, metaX + 12, yy, { width: metaW - 24 });
+    drawMixedText(doc, fontsLoaded, t, metaX + 12, yy, {
+      width: metaW - 24,
+      fontSize: 12,
+      wrap: false,
+    });
     yy += 18;
   });
 
@@ -268,7 +464,7 @@ function buildInvoicePDF(res, invoice) {
   const tableY = sectionY + 120;
   const tableW = right - left;
 
-  // คอลัมน์ให้พอดี A4 (ไทย/จีน)
+  // คอลัมน์ให้พอดี A4
   const baseCols = [
     { title: "วันที่ซื้อของ", w: 70, align: "left" },
     { title: "รายการ", w: 165, align: "left" },
@@ -291,10 +487,17 @@ function buildInvoicePDF(res, invoice) {
   doc.rect(left, tableY, tableW, headerH2).fill(red);
 
   // header text
-  setFont("HEADER", true).fontSize(10).fillColor("#ffffff");
+  doc.fillColor("#ffffff");
   let x = left;
   cols.forEach((c) => {
-    doc.text(c.title, x + 4, tableY + 6, { width: c.w - 8, align: "center" });
+    // หัวตารางเป็นไทยล้วน แต่ใช้ drawMixedText ได้เลย
+    drawMixedText(doc, fontsLoaded, c.title, x + 4, tableY + 6, {
+      width: c.w - 8,
+      align: "center",
+      fontSize: 10,
+      bold: true,
+      wrap: false,
+    });
     x += c.w;
   });
 
@@ -302,29 +505,35 @@ function buildInvoicePDF(res, invoice) {
   const rate = safeNumber(invoice.rate, 0);
 
   let y = tableY + headerH2;
-  setFont("row", false).fontSize(10).fillColor("#000000");
+  doc.fillColor("#000000");
+
+  const redrawTableHeader = (yTop) => {
+    doc.rect(left, yTop, tableW, headerH2).fill(red);
+    doc.fillColor("#ffffff");
+
+    let xx = left;
+    cols.forEach((c) => {
+      drawMixedText(doc, fontsLoaded, c.title, xx + 4, yTop + 6, {
+        width: c.w - 8,
+        align: "center",
+        fontSize: 10,
+        bold: true,
+        wrap: false,
+      });
+      xx += c.w;
+    });
+
+    doc.fillColor("#000000");
+  };
 
   const ensureSpace = (neededH) => {
     if (y + neededH > bottom) {
       doc.addPage();
-      const fontsLoaded2 = registerFonts(doc); // re-register after addPage
-      // sync fontsLoaded object (keep it usable)
-      fontsLoaded.th = fontsLoaded2.th;
-      fontsLoaded.zh = fontsLoaded2.zh;
+      // fonts are still registered, but call registerFonts again is safe
+      registerFonts(doc);
 
       y = doc.page.margins.top;
-
-      // re-draw header on new page
-      doc.rect(left, y, tableW, headerH2).fill(red);
-      setFont("HEADER", true).fontSize(10).fillColor("#fff");
-
-      let xx = left;
-      cols.forEach((c) => {
-        doc.text(c.title, xx + 4, y + 6, { width: c.w - 8, align: "center" });
-        xx += c.w;
-      });
-
-      setFont("row", false).fontSize(10).fillColor("#000");
+      redrawTableHeader(y);
       y += headerH2;
     }
   };
@@ -334,27 +543,37 @@ function buildInvoicePDF(res, invoice) {
 
     if (isStripe) {
       doc.rect(left, y, tableW, rowH).fill("#f7f7f7");
-      setFont("row", false).fillColor("#000");
+      doc.fillColor("#000");
     }
 
-    // grid lines
+    // outer row border
     doc.rect(left, y, tableW, rowH).lineWidth(0.5).stroke("#dddddd");
 
     let xx = left;
+
     rowValues.forEach((val, idx) => {
       const c = cols[idx];
-      const txt = String(val ?? "");
-      setFont(txt, false).fontSize(10).fillColor("#000");
-      doc.text(txt, xx + 4, y + 6, {
+      let txt = String(val ?? "");
+
+      // fit text to cell width (กันข้อความยาว + กัน wrap ทำให้ล้น rowH)
+      txt = fitMixedTextToWidth(doc, fontsLoaded, txt, c.w - 8, 10, false);
+
+      drawMixedText(doc, fontsLoaded, txt, xx + 4, y + 6, {
         width: c.w - 8,
         align: c.align || "left",
+        fontSize: 10,
+        bold: false,
+        wrap: false,
       });
+
       xx += c.w;
 
+      // vertical line
       doc.moveTo(xx, y).lineTo(xx, y + rowH).lineWidth(0.5).stroke("#dddddd");
     });
 
     y += rowH;
+    doc.fillColor("#000");
   };
 
   // totals
@@ -393,60 +612,97 @@ function buildInvoicePDF(res, invoice) {
 
   // TOTAL row (red)
   doc.rect(left, y, tableW, rowH).fill(red);
-  setFont("TOTAL", true).fontSize(12).fillColor("#fff");
+  doc.fillColor("#fff");
 
   // total label spans first 2 columns
   const spanW = cols[0].w + cols[1].w;
-  doc.text("TOTAL", left + 6, y + 5, { width: spanW - 12, align: "left" });
+  drawMixedText(doc, fontsLoaded, "TOTAL", left + 6, y + 5, {
+    width: spanW - 12,
+    align: "left",
+    fontSize: 12,
+    bold: true,
+    wrap: false,
+  });
 
   const amountTotal =
     rate > 0
       ? totalWeight * rate
       : items.reduce((sum, it) => {
-          const boxes = safeNumber(it.boxes, 0);
-          const wPerBox = safeNumber(it.weightPerBox, 0);
-          const wTotal = boxes * wPerBox;
-          const price = safeNumber(it.pricePerKg, 0);
-          return sum + wTotal * price;
+          const b = safeNumber(it.boxes, 0);
+          const wpb = safeNumber(it.weightPerBox, 0);
+          const wt = b * wpb;
+          const p = safeNumber(it.pricePerKg, 0);
+          return sum + wt * p;
         }, 0);
 
-  // Draw totals aligned in their column positions
+  // totals aligned in column positions
   let colX = left;
   cols.forEach((c, idx) => {
     if (idx === 2) {
-      doc.text(totalBoxes.toLocaleString(), colX + 4, y + 5, { width: c.w - 8, align: "right" });
+      drawMixedText(doc, fontsLoaded, totalBoxes.toLocaleString(), colX + 4, y + 5, {
+        width: c.w - 8,
+        align: "right",
+        fontSize: 12,
+        bold: true,
+        wrap: false,
+      });
     }
     if (idx === 4) {
-      doc.text(totalWeight.toLocaleString(), colX + 4, y + 5, { width: c.w - 8, align: "right" });
+      drawMixedText(doc, fontsLoaded, totalWeight.toLocaleString(), colX + 4, y + 5, {
+        width: c.w - 8,
+        align: "right",
+        fontSize: 12,
+        bold: true,
+        wrap: false,
+      });
     }
     if (idx === 6) {
-      doc.text(amountTotal.toLocaleString(), colX + 4, y + 5, { width: c.w - 8, align: "right" });
+      drawMixedText(doc, fontsLoaded, amountTotal.toLocaleString(), colX + 4, y + 5, {
+        width: c.w - 8,
+        align: "right",
+        fontSize: 12,
+        bold: true,
+        wrap: false,
+      });
     }
     colX += c.w;
   });
 
   y += rowH + 10;
+  doc.fillColor("#000");
 
   // Freight section (optional)
   const freights = Array.isArray(invoice.freightItems) ? invoice.freightItems : [];
   if (freights.length > 0) {
-    ensureSpace(80);
-    setFont("Freight Charges", true).fontSize(14).fillColor("#000");
-    doc.text("Freight Charges", left, y);
+    ensureSpace(100);
+
+    drawMixedText(doc, fontsLoaded, "Freight Charges", left, y, {
+      width: tableW,
+      fontSize: 14,
+      bold: true,
+      wrap: false,
+    });
     y += 18;
 
-    setFont("row", false).fontSize(11);
     freights.forEach((f, i) => {
       ensureSpace(18);
+
       const subtotal = safeNumber(f.weight, 0) * safeNumber(f.pricePerKg, 0);
       const line = `${i + 1}. ${f.variety || "-"} ${f.grade ? `(${f.grade})` : ""} | ${safeNumber(
         f.weight,
         0
       )} kg × ${safeNumber(f.pricePerKg, 0)} = ${subtotal.toLocaleString()} บาท`;
 
-      setFont(line, false).fontSize(11);
-      doc.text(line, left, y, { width: tableW });
-      y += 16;
+      // ใช้ drawMixedText (ไทย+จีนในบรรทัดเดียวได้)
+      y = drawMixedText(doc, fontsLoaded, line, left, y, {
+        width: tableW,
+        fontSize: 11,
+        bold: false,
+        wrap: true,
+        lineGap: 1,
+      });
+
+      y += 2;
     });
 
     y += 8;
@@ -454,15 +710,26 @@ function buildInvoicePDF(res, invoice) {
 
   // Note
   if (invoice.note && String(invoice.note).trim()) {
-    ensureSpace(80);
-    setFont("Note", true).fontSize(14).fillColor("#000");
-    doc.text("Note", left, y);
+    ensureSpace(120);
+
+    drawMixedText(doc, fontsLoaded, "Note", left, y, {
+      width: tableW,
+      fontSize: 14,
+      bold: true,
+      wrap: false,
+    });
     y += 18;
 
     const noteText = String(invoice.note);
-    setFont(noteText, false).fontSize(12);
-    doc.text(noteText, left, y, { width: tableW });
-    y += 18;
+    y = drawMixedText(doc, fontsLoaded, noteText, left, y, {
+      width: tableW,
+      fontSize: 12,
+      bold: false,
+      wrap: true,
+      lineGap: 2,
+    });
+
+    y += 8;
   }
 
   // Signatures
@@ -472,11 +739,18 @@ function buildInvoicePDF(res, invoice) {
   const sig1 = "ผู้ส่งสินค้า";
   const sig2 = "ผู้รับสินค้า";
 
-  setFont(sig1, false).fontSize(12).fillColor("#000");
-  doc.text(sig1, left + 40, sigY, { width: 200, align: "center" });
-
-  setFont(sig2, false).fontSize(12).fillColor("#000");
-  doc.text(sig2, right - 240, sigY, { width: 200, align: "center" });
+  drawMixedText(doc, fontsLoaded, sig1, left + 40, sigY, {
+    width: 200,
+    align: "center",
+    fontSize: 12,
+    wrap: false,
+  });
+  drawMixedText(doc, fontsLoaded, sig2, right - 240, sigY, {
+    width: 200,
+    align: "center",
+    fontSize: 12,
+    wrap: false,
+  });
 
   doc.moveTo(left + 40, sigY + 35).lineTo(left + 240, sigY + 35).stroke("#000");
   doc.moveTo(right - 240, sigY + 35).lineTo(right - 40, sigY + 35).stroke("#000");
@@ -535,7 +809,6 @@ router.post("/", async (req, res) => {
         companyPhone: body.companyPhone || null,
 
         companyLogoKey: body.companyLogoKey || null,
-        companyLogoB64: body.companyLogoB64 || null,
 
         note: body.note || null,
 
@@ -663,7 +936,6 @@ router.put("/:id", async (req, res) => {
         companyPhone: body.companyPhone || null,
 
         companyLogoKey: body.companyLogoKey || null,
-        companyLogoB64: body.companyLogoB64 || null,
 
         note: body.note || null,
 
