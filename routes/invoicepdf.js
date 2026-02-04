@@ -146,9 +146,9 @@ function buildInvoicePDF(res, invoice) {
 
   // --- logo: base64 > preset > default
   const logoPresets = {
-    logo1: path.join(__dirname, "../picture/logo1.png"),
-    logo2: path.join(__dirname, "../picture/logo2.png"),
-    logo3: path.join(__dirname, "../picture/logo3.png"),
+    logo1: path.join(__dirname, "../picture/S__5275654png (1).png"),
+    logo2: path.join(__dirname, "../picture/dos.png"),
+    logo3: path.join(__dirname, "../picture/logo2.png"),
   };
   const defaultLogo = path.join(__dirname, "../picture/S__5275654png (1).png");
 
