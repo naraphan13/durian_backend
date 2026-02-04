@@ -269,22 +269,27 @@ model ExpenseNote {
 model Invoice {
   id            Int      @id @default(autoincrement())
   date          DateTime
-  destination   String?      // ปลายทาง
-  containerInfo String?      // ข้อมูลตู้
-  containerCode String?      // รหัสตู้
-  refCode       String?      // รหัสอ้างอิง
 
-  invoiceNo     Int      @default(1)   // #1
-  rate          Float?                 // เช่น 12 (ถ้าใช้คำนวณ)
+  destination   String?
+  containerInfo String?
+  containerCode String?
+  refCode       String?
+
+  invoiceNo     Int      @default(1)
+  rate          Float?
 
   billToName    String?
   billToAddress String?   @db.Text
   billToTaxId   String?
 
-  companyName   String?   @default("SURIYA 388 CO.,LTD.")
-  companyAddress String?  @db.Text
-  companyTaxId  String?
-  companyPhone  String?
+  companyName    String?   @default("SURIYA 388 CO.,LTD.")
+  companyAddress String?   @db.Text
+  companyTaxId   String?
+  companyPhone   String?
+
+  // ✅ เพิ่มโลโก้
+  companyLogoKey String?
+  companyLogoB64 String?  @db.LongText
 
   note          String?   @db.Text
 
@@ -296,7 +301,13 @@ model Invoice {
 
   seasonId      Int?
   season        Season?  @relation(fields: [seasonId], references: [id])
+
+  @@index([date])
+  @@index([seasonId])
+  @@index([containerCode])
+  @@index([refCode])
 }
+
 
 model InvoiceItem {
   id         Int     @id @default(autoincrement())

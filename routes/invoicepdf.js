@@ -1,52 +1,404 @@
-// routes/invoicepdf.js
-// ✅ ระบบ INVOICE ใหม่ (ไม่ยุ่งกับ ExportContainer)
-// ✅ CRUD + Generate PDF จากข้อมูลใน DB
-// ✅ ใช้ Prisma models: Invoice, InvoiceItem, InvoiceFreightItem (ตาม schema ที่ผมให้ก่อนหน้า)
-// ✅ Mount แนะนำ: app.use("/v1/invoices", require("./routes/invoicepdf"));
+// invoicepdf.js
+// ✅ Router ใหม่ “Invoice” แยกจาก ExportContainer 100%
+// ✅ CRUD + Generate PDF
+// ✅ รองรับ Prisma schema ที่คุณให้ (Invoice + InvoiceItem + InvoiceFreightItem + seasonId)
+// ✅ รองรับโลโก้ 2 แบบ:
+//    1) preset โดยใช้ companyLogoKey (logo1/logo2/logo3)
+//    2) อัปโหลดเป็น base64 dataURL เก็บใน DB (companyLogoB64)
+// ✅ PDF: ตารางมี “ราคา + รวมเงิน” แน่นอน (แก้ปัญหาคอลัมน์หลุดหน้า)
+// ✅ Endpoint:
+//    POST   /v1/invoices
+//    GET    /v1/invoices?seasonId=...
+//    GET    /v1/invoices/:id
+//    PUT    /v1/invoices/:id
+//    DELETE /v1/invoices/:id
+//    GET    /v1/invoices/:id/pdf
 
 const express = require("express");
 const PDFDocument = require("pdfkit");
 const fs = require("fs");
 const path = require("path");
-const prisma = require("../models/prisma");
-
+const prisma = require("../models/prisma"); // ✅ แก้ path ให้ตรงโปรเจกต์คุณถ้าไม่ใช่
 const router = express.Router();
 
-/* ------------------------- helpers ------------------------- */
-function n(v, fallback = 0) {
-  const x = Number(v);
-  return Number.isFinite(x) ? x : fallback;
+/* ----------------------------- utils ----------------------------- */
+function safeNumber(v, fallback = 0) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
 }
-function s(v, fallback = "-") {
-  return v === null || v === undefined || v === "" ? fallback : String(v);
+function thDate(d) {
+  try {
+    return new Date(d).toLocaleDateString("th-TH");
+  } catch {
+    return String(d || "");
+  }
 }
 function toDateOnly(d) {
   const dt = new Date(d);
   return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate());
 }
-function money(v) {
-  return n(v, 0).toLocaleString();
-}
-function num(v) {
-  return n(v, 0).toLocaleString();
+function parseDataUrlToBuffer(dataUrl) {
+  // data:image/png;base64,xxxx
+  const parts = String(dataUrl || "").split(",");
+  if (parts.length < 2) return null;
+  return Buffer.from(parts[1], "base64");
 }
 
-/* ------------------------- CRUD: CREATE ------------------------- */
-// POST /v1/invoices
+/* ----------------------------- fonts ----------------------------- */
+function registerThaiFonts(doc) {
+  const fontPath = path.join(__dirname, "../fonts/THSarabunNew.ttf");
+  const fontBold = path.join(__dirname, "../fonts/THSarabunNewBold.ttf");
+
+  if (fs.existsSync(fontPath)) doc.registerFont("thai", fontPath);
+  if (fs.existsSync(fontBold)) doc.registerFont("thai-bold", fontBold);
+
+  // fallback
+  if (doc._fontFamilies && doc._fontFamilies["thai"]) doc.font("thai");
+}
+
+/* ----------------------------- PDF maker ----------------------------- */
+function buildInvoicePDF(res, invoice) {
+  // ✅ A4 แนวตั้ง
+  const doc = new PDFDocument({ size: "A4", margin: 40 });
+
+  let buffers = [];
+  doc.on("data", buffers.push.bind(buffers));
+  doc.on("end", () => {
+    const pdfData = Buffer.concat(buffers);
+    res.writeHead(200, {
+      "Content-Type": "application/pdf",
+      "Content-Disposition": `attachment; filename=invoice-${invoice.id}.pdf`,
+      "Content-Length": pdfData.length,
+    });
+    res.end(pdfData);
+  });
+
+  registerThaiFonts(doc);
+
+  const setFont = (bold = false) => {
+    if (bold && doc._fontFamilies && doc._fontFamilies["thai-bold"]) doc.font("thai-bold");
+    else if (doc._fontFamilies && doc._fontFamilies["thai"]) doc.font("thai");
+    return doc;
+  };
+
+  // layout constants
+  const pageW = doc.page.width;
+  const left = doc.page.margins.left;
+  const right = pageW - doc.page.margins.right;
+  const top = doc.page.margins.top;
+
+  // --- header box
+  const headerH = 120;
+  doc.roundedRect(left, top, right - left, headerH, 10).lineWidth(1).stroke("#cccccc");
+
+  // --- logo: base64 > preset > default
+  const logoPresets = {
+    logo1: path.join(__dirname, "../picture/logo1.png"),
+    logo2: path.join(__dirname, "../picture/logo2.png"),
+    logo3: path.join(__dirname, "../picture/logo3.png"),
+  };
+  const defaultLogo = path.join(__dirname, "../picture/S__5275654png (1).png");
+
+  let logoDrawn = false;
+  // 1) base64
+  if (invoice.companyLogoB64 && String(invoice.companyLogoB64).includes("base64")) {
+    try {
+      const buf = parseDataUrlToBuffer(invoice.companyLogoB64);
+      if (buf) {
+        doc.image(buf, left + 12, top + 12, { width: 70 });
+        logoDrawn = true;
+      }
+    } catch (_) {
+      logoDrawn = false;
+    }
+  }
+  // 2) preset
+  if (!logoDrawn && invoice.companyLogoKey && logoPresets[invoice.companyLogoKey]) {
+    const p = logoPresets[invoice.companyLogoKey];
+    if (fs.existsSync(p)) {
+      doc.image(p, left + 12, top + 12, { width: 70 });
+      logoDrawn = true;
+    }
+  }
+  // 3) default
+  if (!logoDrawn && fs.existsSync(defaultLogo)) {
+    doc.image(defaultLogo, left + 12, top + 12, { width: 70 });
+  }
+
+  // company text
+  setFont(true).fontSize(18).fillColor("#000000");
+  doc.text(invoice.companyName || "SURIYA 388 CO.,LTD.", left + 95, top + 12, { width: 280 });
+
+  setFont(false).fontSize(12);
+  doc.text(invoice.companyAddress || "", left + 95, top + 36, { width: 280 });
+  if (invoice.companyTaxId) doc.text(`เลขประจำตัวผู้เสียภาษี: ${invoice.companyTaxId}`, left + 95, top + 70, { width: 280 });
+  if (invoice.companyPhone) doc.text(`Tel: ${invoice.companyPhone}`, left + 95, top + 88, { width: 280 });
+
+  // INVOICE info (right)
+  setFont(true).fontSize(24).fillColor("#cc0000");
+  doc.text("INVOICE", right - 170, top + 12, { width: 170, align: "right" });
+
+  setFont(false).fontSize(12).fillColor("#000");
+  doc.text(`DATE: ${thDate(invoice.date)}`, right - 220, top + 48, { width: 220, align: "right" });
+  doc.text(`NO: #${invoice.invoiceNo || 1}`, right - 220, top + 66, { width: 220, align: "right" });
+
+  // --- Bill to + meta
+  const sectionY = top + headerH + 16;
+
+  // Bill To box
+  doc.roundedRect(left, sectionY, (right - left) * 0.55 - 6, 100, 10).lineWidth(1).stroke("#cccccc");
+  setFont(true).fontSize(14).fillColor("#000");
+  doc.text("BILL TO", left + 12, sectionY + 10);
+
+  setFont(false).fontSize(12);
+  doc.text(invoice.billToName || "-", left + 12, sectionY + 32, { width: (right - left) * 0.55 - 30 });
+  if (invoice.billToTaxId) {
+    doc.text(`Tax ID: ${invoice.billToTaxId}`, left + 12, sectionY + 50, { width: (right - left) * 0.55 - 30 });
+  }
+  if (invoice.billToAddress) {
+    doc.text(invoice.billToAddress, left + 12, sectionY + 68, { width: (right - left) * 0.55 - 30 });
+  }
+
+  // Meta box
+  const metaX = left + (right - left) * 0.55 + 6;
+  const metaW = right - metaX;
+  doc.roundedRect(metaX, sectionY, metaW, 100, 10).lineWidth(1).stroke("#cccccc");
+
+  setFont(true).fontSize(14);
+  doc.text("DETAIL", metaX + 12, sectionY + 10);
+
+  setFont(false).fontSize(12);
+  const metaLines = [
+    `Destination: ${invoice.destination || "-"}`,
+    `Container: ${invoice.containerInfo || "-"}`,
+    `Container Code: ${invoice.containerCode || "-"}`,
+    `Reference: ${invoice.refCode || "-"}`,
+  ];
+  let yy = sectionY + 32;
+  metaLines.forEach((t) => {
+    doc.text(t, metaX + 12, yy, { width: metaW - 24 });
+    yy += 18;
+  });
+
+  // --- Items Table
+  const tableY = sectionY + 120;
+  const tableW = right - left;
+
+  // ✅ คอลัมน์ใหม่ให้พอดี A4 (แก้ปัญหาราคา/รวมเงินหลุดหน้า)
+  // รวมความกว้าง = 535 ที่ area tableW เราจะวาดเต็มได้ เพราะ tableW ~ 515-535 ตาม margin
+  // เพื่อความปลอดภัย ใช้ tableW จริง แล้ว scale ได้เล็กน้อย
+  const baseCols = [
+    { title: "วันที่ซื้อของ", w: 70, align: "left" },
+    { title: "รายการ", w: 165, align: "left" },
+    { title: "จำนวน\n(กล่อง)", w: 55, align: "right" },
+    { title: "น้ำหนัก\nกล่อง : KG", w: 70, align: "right" },
+    { title: "น้ำหนักรวม", w: 70, align: "right" },
+    { title: "ราคา", w: 45, align: "right" },
+    { title: "รวมเงิน", w: 60, align: "right" },
+  ];
+  const baseSum = baseCols.reduce((s, c) => s + c.w, 0);
+  const scale = tableW / baseSum;
+  const cols = baseCols.map((c) => ({ ...c, w: Math.floor(c.w * scale) }));
+  // ปรับช่องสุดท้ายให้รวมเท่ากับ tableW เป๊ะ
+  const wSum = cols.reduce((s, c) => s + c.w, 0);
+  cols[cols.length - 1].w += tableW - wSum;
+
+  const rowH = 22;
+  const headerH2 = 26;
+  const red = "#cc0000";
+
+  // table header background
+  doc.rect(left, tableY, tableW, headerH2).fill(red);
+
+  // header text
+  setFont(true).fontSize(10).fillColor("#ffffff");
+  let x = left;
+  cols.forEach((c) => {
+    doc.text(c.title, x + 4, tableY + 6, { width: c.w - 8, align: "center" });
+    x += c.w;
+  });
+
+  // rows
+  const items = Array.isArray(invoice.items) ? invoice.items : [];
+  const rate = safeNumber(invoice.rate, 0);
+
+  let y = tableY + headerH2;
+  setFont(false).fontSize(10).fillColor("#000000");
+
+  const ensureSpace = (neededH) => {
+    if (y + neededH > doc.page.height - doc.page.margins.bottom) {
+      doc.addPage();
+      registerThaiFonts(doc);
+      y = doc.page.margins.top;
+      // re-draw header on new page
+      doc.rect(left, y, tableW, headerH2).fill(red);
+      setFont(true).fontSize(10).fillColor("#fff");
+      let xx = left;
+      cols.forEach((c) => {
+        doc.text(c.title, xx + 4, y + 6, { width: c.w - 8, align: "center" });
+        xx += c.w;
+      });
+      setFont(false).fontSize(10).fillColor("#000");
+      y += headerH2;
+    }
+  };
+
+  // draw row function
+  const drawRow = (rowValues, isStripe) => {
+    ensureSpace(rowH + 2);
+
+    if (isStripe) {
+      doc.rect(left, y, tableW, rowH).fill("#f7f7f7");
+      setFont(false).fillColor("#000");
+    }
+
+    // grid lines
+    doc.rect(left, y, tableW, rowH).lineWidth(0.5).stroke("#dddddd");
+
+    let xx = left;
+    rowValues.forEach((val, idx) => {
+      const c = cols[idx];
+      doc.text(String(val ?? ""), xx + 4, y + 6, {
+        width: c.w - 8,
+        align: c.align || "left",
+      });
+      xx += c.w;
+      // vertical line
+      doc.moveTo(xx, y).lineTo(xx, y + rowH).lineWidth(0.5).stroke("#dddddd");
+    });
+
+    y += rowH;
+  };
+
+  // compute totals
+  let totalBoxes = 0;
+  let totalWeight = 0;
+
+  items.forEach((it, idx) => {
+    const boxes = safeNumber(it.boxes, 0);
+    const wPerBox = safeNumber(it.weightPerBox, 0);
+    const wTotal = boxes * wPerBox;
+    const price = rate > 0 ? rate : safeNumber(it.pricePerKg, 0);
+    const amount = wTotal * price;
+
+    totalBoxes += boxes;
+    totalWeight += wTotal;
+
+    const itemName = `${it.brand ? it.brand + " " : ""}${it.variety || ""} ${it.grade ? `(${it.grade})` : ""}`.trim();
+
+    drawRow(
+      [
+        thDate(invoice.date),
+        itemName || "-",
+        boxes ? boxes.toLocaleString() : "",
+        wPerBox ? wPerBox.toLocaleString() : "",
+        wTotal ? wTotal.toLocaleString() : "",
+        price ? price.toLocaleString() : "",
+        amount ? amount.toLocaleString() : "",
+      ],
+      idx % 2 === 1
+    );
+  });
+
+  // summary rows
+  ensureSpace(80);
+
+  // TOTAL row (red)
+  doc.rect(left, y, tableW, rowH).fill(red);
+  setFont(true).fontSize(12).fillColor("#fff");
+
+  // total label spans first 2 columns
+  const spanW = cols[0].w + cols[1].w;
+  doc.text("TOTAL", left + 6, y + 5, { width: spanW - 12, align: "left" });
+
+  // put totals in columns
+  // columns: 2=boxes, 4=weight total, 6=amount total
+  const amountTotal = rate > 0
+    ? totalWeight * rate
+    : items.reduce((sum, it) => {
+        const boxes = safeNumber(it.boxes, 0);
+        const wPerBox = safeNumber(it.weightPerBox, 0);
+        const wTotal = boxes * wPerBox;
+        const price = safeNumber(it.pricePerKg, 0);
+        return sum + wTotal * price;
+      }, 0);
+
+  // Draw totals aligned in their column positions
+  let colX = left;
+  cols.forEach((c, idx) => {
+    if (idx === 2) {
+      doc.text(totalBoxes.toLocaleString(), colX + 4, y + 5, { width: c.w - 8, align: "right" });
+    }
+    if (idx === 4) {
+      doc.text(totalWeight.toLocaleString(), colX + 4, y + 5, { width: c.w - 8, align: "right" });
+    }
+    if (idx === 6) {
+      doc.text(amountTotal.toLocaleString(), colX + 4, y + 5, { width: c.w - 8, align: "right" });
+    }
+    colX += c.w;
+  });
+
+  y += rowH + 10;
+
+  // Freight section (optional)
+  const freights = Array.isArray(invoice.freightItems) ? invoice.freightItems : [];
+  if (freights.length > 0) {
+    ensureSpace(60);
+    setFont(true).fontSize(14).fillColor("#000");
+    doc.text("Freight Charges", left, y);
+    y += 18;
+
+    setFont(false).fontSize(11);
+    freights.forEach((f, i) => {
+      ensureSpace(18);
+      const subtotal = safeNumber(f.weight, 0) * safeNumber(f.pricePerKg, 0);
+      doc.text(
+        `${i + 1}. ${f.variety || "-"} ${f.grade ? `(${f.grade})` : ""} | ${safeNumber(f.weight, 0)} kg × ${safeNumber(f.pricePerKg, 0)} = ${subtotal.toLocaleString()} บาท`,
+        left,
+        y,
+        { width: tableW }
+      );
+      y += 16;
+    });
+
+    y += 8;
+  }
+
+  // Note
+  if (invoice.note && String(invoice.note).trim()) {
+    ensureSpace(60);
+    setFont(true).fontSize(14).fillColor("#000");
+    doc.text("Note", left, y);
+    y += 18;
+    setFont(false).fontSize(12);
+    doc.text(String(invoice.note), left, y, { width: tableW });
+    y += 18;
+  }
+
+  // Signatures
+  ensureSpace(120);
+  const sigY = doc.page.height - doc.page.margins.bottom - 90;
+  setFont(false).fontSize(12).fillColor("#000");
+  doc.text("ผู้ส่งสินค้า", left + 40, sigY, { width: 200, align: "center" });
+  doc.text("ผู้รับสินค้า", right - 240, sigY, { width: 200, align: "center" });
+
+  doc.moveTo(left + 40, sigY + 35).lineTo(left + 240, sigY + 35).stroke("#000");
+  doc.moveTo(right - 240, sigY + 35).lineTo(right - 40, sigY + 35).stroke("#000");
+
+  doc.end();
+}
+
+/* ----------------------------- ROUTES ----------------------------- */
+
+// CREATE Invoice
 router.post("/", async (req, res) => {
   try {
     const body = req.body || {};
 
-    // ✅ invoice date (required)
-    const date = body.date ? new Date(body.date) : null;
-    if (!date || isNaN(date.getTime())) {
-      return res.status(400).json({ error: "date is required and must be valid Date" });
-    }
-
-    // ✅ auto seasonId (optional) เหมือนระบบเดิมของคุณ
+    // season auto-detect (ถ้าคุณใช้ Season)
     let seasonId = null;
-    try {
-      const billDate = toDateOnly(date);
+    if (body.date) {
+      const billDate = toDateOnly(new Date(body.date));
       const season = await prisma.season.findFirst({
         where: {
           startDate: { lte: billDate },
@@ -54,9 +406,6 @@ router.post("/", async (req, res) => {
         },
       });
       seasonId = season?.id || null;
-    } catch (e) {
-      // ถ้าไม่มี Season model / ไม่อยากใช้ ก็ไม่ต้อง fail
-      seasonId = null;
     }
 
     const items = Array.isArray(body.items) ? body.items : [];
@@ -64,45 +413,47 @@ router.post("/", async (req, res) => {
 
     const created = await prisma.invoice.create({
       data: {
-        date,
-        destination: body.destination ?? body.city ?? null,
-        containerInfo: body.containerInfo ?? null,
-        containerCode: body.containerCode ?? null,
-        refCode: body.refCode ?? null,
+        date: new Date(body.date),
+        destination: body.destination || null,
+        containerInfo: body.containerInfo || null,
+        containerCode: body.containerCode || null,
+        refCode: body.refCode || null,
 
-        invoiceNo: n(body.invoiceNo, 1),
-        rate: body.rate !== undefined ? n(body.rate, 0) : body.exchangeRate !== undefined ? n(body.exchangeRate, 0) : null,
+        invoiceNo: safeNumber(body.invoiceNo, 1),
+        rate: body.rate === null || body.rate === undefined ? null : safeNumber(body.rate, 0),
 
-        billToName: body.billToName ?? body.billTo?.name ?? null,
-        billToAddress: body.billToAddress ?? body.billTo?.address ?? null,
-        billToTaxId: body.billToTaxId ?? body.billTo?.taxId ?? null,
+        billToName: body.billToName || null,
+        billToAddress: body.billToAddress || null,
+        billToTaxId: body.billToTaxId || null,
 
-        companyName: body.companyName ?? "SURIYA 388 CO.,LTD.",
-        companyAddress: body.companyAddress ?? null,
-        companyTaxId: body.companyTaxId ?? null,
-        companyPhone: body.companyPhone ?? null,
+        companyName: body.companyName || null,
+        companyAddress: body.companyAddress || null,
+        companyTaxId: body.companyTaxId || null,
+        companyPhone: body.companyPhone || null,
 
-        note: body.note ?? body.brandSummary ?? null,
+        companyLogoKey: body.companyLogoKey || null,
+        companyLogoB64: body.companyLogoB64 || null,
+
+        note: body.note || null,
 
         seasonId,
 
         items: {
           create: items.map((it) => ({
-            brand: it.brand ?? null,
-            variety: it.variety ?? null,
-            grade: it.grade ?? null,
-            boxes: it.boxes !== undefined ? n(it.boxes, 0) : null,
-            weightPerBox: it.weightPerBox !== undefined ? n(it.weightPerBox, 0) : null,
-            pricePerKg: it.pricePerKg !== undefined ? n(it.pricePerKg, 0) : null,
+            brand: it.brand || null,
+            variety: it.variety || null,
+            grade: it.grade || null,
+            boxes: it.boxes === null || it.boxes === undefined ? null : safeNumber(it.boxes, 0),
+            weightPerBox: it.weightPerBox === null || it.weightPerBox === undefined ? null : safeNumber(it.weightPerBox, 0),
+            pricePerKg: it.pricePerKg === null || it.pricePerKg === undefined ? null : safeNumber(it.pricePerKg, 0),
           })),
         },
-
         freightItems: {
-          create: freightItems.map((it) => ({
-            variety: it.variety ?? null,
-            grade: it.grade ?? null,
-            weight: it.weight !== undefined ? n(it.weight, 0) : null,
-            pricePerKg: it.pricePerKg !== undefined ? n(it.pricePerKg, 0) : null,
+          create: freightItems.map((f) => ({
+            variety: f.variety || null,
+            grade: f.grade || null,
+            weight: f.weight === null || f.weight === undefined ? null : safeNumber(f.weight, 0),
+            pricePerKg: f.pricePerKg === null || f.pricePerKg === undefined ? null : safeNumber(f.pricePerKg, 0),
           })),
         },
       },
@@ -112,35 +463,32 @@ router.post("/", async (req, res) => {
     res.json(created);
   } catch (err) {
     console.error("❌ POST /v1/invoices error::", err);
-    res.status(500).json({ error: "เกิดข้อผิดพลาดในการสร้าง Invoice", details: err });
+    res.status(500).json({ error: "เกิดข้อผิดพลาดในการบันทึก Invoice", details: String(err) });
   }
 });
 
-/* ------------------------- CRUD: READ ALL ------------------------- */
-// GET /v1/invoices?seasonId=...
+// READ ALL (รองรับ ?seasonId=...)
 router.get("/", async (req, res) => {
   try {
     const seasonId = req.query.seasonId ? parseInt(req.query.seasonId) : null;
 
-    const invoices = await prisma.invoice.findMany({
+    const list = await prisma.invoice.findMany({
       where: seasonId ? { seasonId } : {},
       orderBy: { date: "desc" },
       include: { items: true, freightItems: true },
     });
 
-    res.json(invoices);
+    res.json(list);
   } catch (err) {
     console.error("❌ GET /v1/invoices error::", err);
-    res.status(500).json({ error: "ไม่สามารถดึงรายการ Invoice ได้", details: err });
+    res.status(500).json({ error: "ไม่สามารถดึงรายการได้", details: String(err) });
   }
 });
 
-/* ------------------------- CRUD: READ ONE ------------------------- */
-// GET /v1/invoices/:id
+// READ ONE
 router.get("/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-
     const invoice = await prisma.invoice.findUnique({
       where: { id },
       include: { items: true, freightItems: true },
@@ -150,26 +498,20 @@ router.get("/:id", async (req, res) => {
     res.json(invoice);
   } catch (err) {
     console.error("❌ GET /v1/invoices/:id error::", err);
-    res.status(500).json({ error: "ไม่สามารถดึง Invoice ได้", details: err });
+    res.status(500).json({ error: "ไม่พบเอกสารนี้", details: String(err) });
   }
 });
 
-/* ------------------------- CRUD: UPDATE ------------------------- */
-// PUT /v1/invoices/:id
+// UPDATE
 router.put("/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const body = req.body || {};
 
-    const date = body.date ? new Date(body.date) : null;
-    if (!date || isNaN(date.getTime())) {
-      return res.status(400).json({ error: "date is required and must be valid Date" });
-    }
-
-    // seasonId recalculation (optional)
+    // season auto-detect (ถ้าคุณใช้ Season)
     let seasonId = null;
-    try {
-      const billDate = toDateOnly(date);
+    if (body.date) {
+      const billDate = toDateOnly(new Date(body.date));
       const season = await prisma.season.findFirst({
         where: {
           startDate: { lte: billDate },
@@ -177,107 +519,92 @@ router.put("/:id", async (req, res) => {
         },
       });
       seasonId = season?.id || null;
-    } catch (e) {
-      seasonId = null;
     }
 
     const items = Array.isArray(body.items) ? body.items : [];
     const freightItems = Array.isArray(body.freightItems) ? body.freightItems : [];
 
-    const updated = await prisma.$transaction(async (tx) => {
-      // ลบของเก่าก่อน แล้วสร้างใหม่ (ง่าย/ชัวร์)
-      await tx.invoiceItem.deleteMany({ where: { invoiceId: id } });
-      await tx.invoiceFreightItem.deleteMany({ where: { invoiceId: id } });
+    // ลบรายการย่อยเก่าก่อน แล้วสร้างใหม่ (ง่ายและชัวร์)
+    await prisma.invoiceItem.deleteMany({ where: { invoiceId: id } });
+    await prisma.invoiceFreightItem.deleteMany({ where: { invoiceId: id } });
 
-      const inv = await tx.invoice.update({
-        where: { id },
-        data: {
-          date,
-          destination: body.destination ?? body.city ?? null,
-          containerInfo: body.containerInfo ?? null,
-          containerCode: body.containerCode ?? null,
-          refCode: body.refCode ?? null,
+    const updated = await prisma.invoice.update({
+      where: { id },
+      data: {
+        date: new Date(body.date),
+        destination: body.destination || null,
+        containerInfo: body.containerInfo || null,
+        containerCode: body.containerCode || null,
+        refCode: body.refCode || null,
 
-          invoiceNo: n(body.invoiceNo, 1),
-          rate: body.rate !== undefined ? n(body.rate, 0) : body.exchangeRate !== undefined ? n(body.exchangeRate, 0) : null,
+        invoiceNo: safeNumber(body.invoiceNo, 1),
+        rate: body.rate === null || body.rate === undefined ? null : safeNumber(body.rate, 0),
 
-          billToName: body.billToName ?? body.billTo?.name ?? null,
-          billToAddress: body.billToAddress ?? body.billTo?.address ?? null,
-          billToTaxId: body.billToTaxId ?? body.billTo?.taxId ?? null,
+        billToName: body.billToName || null,
+        billToAddress: body.billToAddress || null,
+        billToTaxId: body.billToTaxId || null,
 
-          companyName: body.companyName ?? "SURIYA 388 CO.,LTD.",
-          companyAddress: body.companyAddress ?? null,
-          companyTaxId: body.companyTaxId ?? null,
-          companyPhone: body.companyPhone ?? null,
+        companyName: body.companyName || null,
+        companyAddress: body.companyAddress || null,
+        companyTaxId: body.companyTaxId || null,
+        companyPhone: body.companyPhone || null,
 
-          note: body.note ?? body.brandSummary ?? null,
-          seasonId,
+        companyLogoKey: body.companyLogoKey || null,
+        companyLogoB64: body.companyLogoB64 || null,
+
+        note: body.note || null,
+
+        seasonId,
+
+        items: {
+          create: items.map((it) => ({
+            brand: it.brand || null,
+            variety: it.variety || null,
+            grade: it.grade || null,
+            boxes: it.boxes === null || it.boxes === undefined ? null : safeNumber(it.boxes, 0),
+            weightPerBox: it.weightPerBox === null || it.weightPerBox === undefined ? null : safeNumber(it.weightPerBox, 0),
+            pricePerKg: it.pricePerKg === null || it.pricePerKg === undefined ? null : safeNumber(it.pricePerKg, 0),
+          })),
         },
-      });
 
-      if (items.length) {
-        await tx.invoiceItem.createMany({
-          data: items.map((it) => ({
-            invoiceId: id,
-            brand: it.brand ?? null,
-            variety: it.variety ?? null,
-            grade: it.grade ?? null,
-            boxes: it.boxes !== undefined ? n(it.boxes, 0) : null,
-            weightPerBox: it.weightPerBox !== undefined ? n(it.weightPerBox, 0) : null,
-            pricePerKg: it.pricePerKg !== undefined ? n(it.pricePerKg, 0) : null,
+        freightItems: {
+          create: freightItems.map((f) => ({
+            variety: f.variety || null,
+            grade: f.grade || null,
+            weight: f.weight === null || f.weight === undefined ? null : safeNumber(f.weight, 0),
+            pricePerKg: f.pricePerKg === null || f.pricePerKg === undefined ? null : safeNumber(f.pricePerKg, 0),
           })),
-        });
-      }
-
-      if (freightItems.length) {
-        await tx.invoiceFreightItem.createMany({
-          data: freightItems.map((it) => ({
-            invoiceId: id,
-            variety: it.variety ?? null,
-            grade: it.grade ?? null,
-            weight: it.weight !== undefined ? n(it.weight, 0) : null,
-            pricePerKg: it.pricePerKg !== undefined ? n(it.pricePerKg, 0) : null,
-          })),
-        });
-      }
-
-      const full = await tx.invoice.findUnique({
-        where: { id },
-        include: { items: true, freightItems: true },
-      });
-
-      return full;
+        },
+      },
+      include: { items: true, freightItems: true },
     });
 
     res.json(updated);
   } catch (err) {
     console.error("❌ PUT /v1/invoices/:id error::", err);
-    res.status(500).json({ error: "อัปเดต Invoice ไม่สำเร็จ", details: err });
+    res.status(500).json({ error: "อัปเดตไม่สำเร็จ", details: String(err) });
   }
 });
 
-/* ------------------------- CRUD: DELETE ------------------------- */
-// DELETE /v1/invoices/:id
+// DELETE
 router.delete("/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
 
-    // onDelete: Cascade ใน schema จะช่วยลบ items ให้
+    // invoiceItem / freightItem จะถูกลบตามเพราะ onDelete: Cascade
     await prisma.invoice.delete({ where: { id } });
 
-    res.json({ message: "ลบ Invoice สำเร็จ" });
+    res.json({ message: "ลบสำเร็จ" });
   } catch (err) {
     console.error("❌ DELETE /v1/invoices/:id error::", err);
-    res.status(500).json({ error: "ลบ Invoice ไม่สำเร็จ", details: err });
+    res.status(500).json({ error: "ลบไม่สำเร็จ", details: String(err) });
   }
 });
 
-/* ------------------------- PDF: Generate from DB ------------------------- */
-// GET /v1/invoices/:id/pdf
+// PDF
 router.get("/:id/pdf", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-
     const invoice = await prisma.invoice.findUnique({
       where: { id },
       include: { items: true, freightItems: true },
@@ -285,317 +612,10 @@ router.get("/:id/pdf", async (req, res) => {
 
     if (!invoice) return res.status(404).json({ error: "ไม่พบ Invoice นี้" });
 
-    // ---------- compute totals ----------
-    const totalBoxes = invoice.items.reduce((sum, it) => sum + n(it.boxes, 0), 0);
-    const totalWeight = invoice.items.reduce((sum, it) => sum + n(it.boxes, 0) * n(it.weightPerBox, 0), 0);
-
-    const rate = invoice.rate !== null && invoice.rate !== undefined ? n(invoice.rate, 0) : 0;
-
-    // ถ้า rate > 0: amount = weightTotal * rate (ตามใบตัวอย่าง)
-    // ถ้า rate == 0: amount = sum(item weightTotal * pricePerKg)
-    const grandTotal =
-      rate > 0
-        ? totalWeight * rate
-        : invoice.items.reduce((sum, it) => {
-            const wTotal = n(it.boxes, 0) * n(it.weightPerBox, 0);
-            return sum + wTotal * n(it.pricePerKg, 0);
-          }, 0);
-
-    // ---------- PDF setup ----------
-    const doc = new PDFDocument({ size: "A4", margin: 40 });
-    const buffers = [];
-    doc.on("data", (b) => buffers.push(b));
-    doc.on("end", () => {
-      const pdfData = Buffer.concat(buffers);
-      res.writeHead(200, {
-        "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename=invoice-${id}.pdf`,
-        "Content-Length": pdfData.length,
-      });
-      res.end(pdfData);
-    });
-
-    // ---------- fonts ----------
-    const fontPath = path.join(__dirname, "../fonts/THSarabunNew.ttf");
-    const fontBold = path.join(__dirname, "../fonts/THSarabunNewBold.ttf");
-
-    let hasThai = false;
-    let hasThaiBold = false;
-
-    if (fs.existsSync(fontPath)) {
-      doc.registerFont("thai", fontPath);
-      hasThai = true;
-    }
-    if (fs.existsSync(fontBold)) {
-      doc.registerFont("thai-bold", fontBold);
-      hasThaiBold = true;
-    }
-
-    const setFont = (bold = false) => {
-      if (bold && hasThaiBold) return doc.font("thai-bold");
-      if (!bold && hasThai) return doc.font("thai");
-      return doc.font("Helvetica");
-    };
-
-    // ---------- assets ----------
-    const logoPath = path.join(__dirname, "../picture/S__5275654png (1).png");
-    const hasLogo = fs.existsSync(logoPath);
-
-    // ---------- page constants ----------
-    const pageW = doc.page.width;
-    const pageH = doc.page.height;
-
-    const left = 25;
-    const right = pageW - 25;
-    const top = 20;
-    const bottom = pageH - 20;
-
-    const red = "#d11";
-    const blue = "#1f3fbf";
-
-    // ---------- border ----------
-    doc.save();
-    doc.lineWidth(2).strokeColor(blue);
-    doc.rect(left, top, right - left, bottom - top).stroke();
-    doc.restore();
-
-    // ---------- header ----------
-    if (hasLogo) doc.image(logoPath, left + 10, top + 10, { width: 70 });
-
-    setFont(true).fontSize(14).fillColor(red).text(s(invoice.companyName, "SURIYA 388 CO.,LTD."), left + 90, top + 18);
-    setFont(false).fontSize(12).fillColor(red).text("บริษัท สุริยา 388 จำกัด", left + 90, top + 38);
-
-    setFont(false)
-      .fontSize(11)
-      .fillColor(red)
-      .text(s(invoice.companyAddress, "203/2 หมู่ที่ 2 ... จังหวัดชุมพร 86190"), left + 90, top + 55, { width: 320 });
-
-    setFont(false).fontSize(11).fillColor(red).text(s(invoice.companyTaxId, "เลขประจำตัวผู้เสียภาษี ..."), left + 90, top + 75);
-    setFont(false).fontSize(11).fillColor(red).text(s(invoice.companyPhone, "เบอร์โทรติดต่อ ..."), left + 90, top + 92);
-
-    setFont(true).fontSize(30).fillColor(red).text("INVOICE", pageW - 235, top + 20, { width: 190, align: "right" });
-    setFont(true).fontSize(12).fillColor(red).text(`柜数/ลำดับตู้   # ${s(invoice.invoiceNo, "1")}`, pageW - 235, top + 55, {
-      width: 190,
-      align: "right",
-    });
-
-    // separator
-    const headerLineY = top + 110;
-    doc.save();
-    doc.strokeColor(red).lineWidth(1);
-    doc.moveTo(left, headerLineY).lineTo(right, headerLineY).stroke();
-    doc.restore();
-
-    // ---------- BILL TO ----------
-    setFont(true).fontSize(16).fillColor(red).text("BILL TO", left + 10, headerLineY + 10);
-
-    setFont(false).fontSize(12).fillColor("black").text(s(invoice.billToName), left + 110, headerLineY + 12, { width: 420 });
-    setFont(false).fontSize(12).fillColor("black").text(s(invoice.billToAddress), left + 110, headerLineY + 30, { width: 420 });
-    setFont(false).fontSize(12).fillColor("black").text(`เลขประจำตัวผู้เสียภาษี ${s(invoice.billToTaxId)}`, left + 110, headerLineY + 55);
-
-    // ---------- meta block ----------
-    const metaY = headerLineY + 90;
-
-    // left column
-    setFont(false).fontSize(11).fillColor(red).text("柜号/เบอร์ตู้", left + 10, metaY);
-    setFont(false).fillColor("black").text(s(invoice.containerCode), left + 110, metaY);
-
-    setFont(false).fillColor(red).text("放柜日期/วันที่ปล่อย", left + 10, metaY + 18);
-    setFont(false).fillColor("black").text(new Date(invoice.date).toLocaleDateString("th-TH"), left + 110, metaY + 18);
-
-    setFont(false).fillColor(red).text("总件数/จำนวนกล่อง", left + 10, metaY + 36);
-    setFont(false).fillColor("black").text(num(totalBoxes), left + 110, metaY + 36);
-
-    // right column
-    const rx = pageW - 310;
-    setFont(false).fillColor(red).text("柜名", rx, metaY);
-    setFont(false).fillColor("black").text(s(invoice.containerInfo), rx + 70, metaY);
-
-    setFont(false).fillColor(red).text("陆运/海运", rx, metaY + 18);
-    setFont(false).fillColor("black").text(s(invoice.destination), rx + 70, metaY + 18);
-
-    setFont(false).fillColor(red).text("净重 (KG)", rx, metaY + 36);
-    setFont(false).fillColor("black").text(num(totalWeight), rx + 70, metaY + 36);
-
-    if (rate > 0) {
-      setFont(false).fillColor(red).text("费用/เรท", rx, metaY + 54);
-      setFont(false).fillColor("black").text(num(rate), rx + 70, metaY + 54);
-    }
-
-    // ---------- table header ----------
-    const tableX = left + 10;
-    const tableW = right - left - 20;
-    const tableY = metaY + 70;
-
-    const cols = [
-      { title: "วันที่ซื้อของ", w: 80, align: "left" },
-      { title: "รายการ", w: 210, align: "left" },
-      { title: "จำนวน\n(กล่อง)", w: 70, align: "right" },
-      { title: "น้ำหนัก\nกล่อง : KG", w: 85, align: "right" },
-      { title: "น้ำหนักรวม", w: 85, align: "right" },
-      { title: "ราคา", w: 55, align: "right" },
-      { title: "รวมเงิน", w: 75, align: "right" },
-    ];
-
-    doc.save();
-    doc.rect(tableX, tableY, tableW, 26).fill("#f6dfd4");
-    doc.restore();
-
-    setFont(true).fontSize(11).fillColor(red);
-    let cx = tableX;
-    cols.forEach((c) => {
-      doc.text(c.title, cx + 2, tableY + 5, { width: c.w - 4, align: c.align });
-      cx += c.w;
-    });
-
-    // ---------- group by brand ----------
-    const groups = {};
-    invoice.items.forEach((it) => {
-      const brand = s(it.brand, "ITEMS");
-      if (!groups[brand]) groups[brand] = [];
-      groups[brand].push(it);
-    });
-
-    let y = tableY + 30;
-    const rowH = 18;
-
-    const drawRowLine = (yy) => {
-      doc.save();
-      doc.strokeColor("#c9b28f").lineWidth(0.7);
-      doc.moveTo(tableX, yy + rowH).lineTo(tableX + tableW, yy + rowH).stroke();
-      doc.restore();
-    };
-
-    const drawTableHeaderAgain = () => {
-      doc.save();
-      doc.rect(tableX, top + 40, tableW, 26).fill("#f6dfd4");
-      doc.restore();
-
-      setFont(true).fontSize(11).fillColor(red);
-      let cx2 = tableX;
-      cols.forEach((c) => {
-        doc.text(c.title, cx2 + 2, top + 45, { width: c.w - 4, align: c.align });
-        cx2 += c.w;
-      });
-    };
-
-    const drawGroupTitle = (title) => {
-      setFont(true).fontSize(12).fillColor(red).text(title, tableX, y, { width: 140 });
-      y += rowH;
-    };
-
-    const drawRow = (row) => {
-      const footerSpace = 150;
-      if (y > pageH - footerSpace) {
-        doc.addPage({ size: "A4", margin: 40 });
-
-        // border
-        doc.save();
-        doc.lineWidth(2).strokeColor(blue);
-        doc.rect(left, top, right - left, bottom - top).stroke();
-        doc.restore();
-
-        drawTableHeaderAgain();
-        y = top + 75;
-      }
-
-      setFont(false).fontSize(11).fillColor("black");
-
-      let x = tableX;
-      const cells = [
-        { v: s(row.date, ""), w: cols[0].w, align: cols[0].align },
-        { v: s(row.item, ""), w: cols[1].w, align: cols[1].align },
-        { v: row.boxes === "" ? "" : num(row.boxes), w: cols[2].w, align: cols[2].align },
-        { v: row.wPer === "" ? "" : num(row.wPer), w: cols[3].w, align: cols[3].align },
-        { v: row.wTotal === "" ? "" : num(row.wTotal), w: cols[4].w, align: cols[4].align },
-        { v: row.price === "" ? "" : num(row.price), w: cols[5].w, align: cols[5].align },
-        { v: row.amount === "" ? "" : money(row.amount), w: cols[6].w, align: cols[6].align },
-      ];
-
-      cells.forEach((c) => {
-        doc.text(c.v, x + 2, y, { width: c.w - 4, align: c.align });
-        x += c.w;
-      });
-
-      drawRowLine(y);
-      y += rowH;
-    };
-
-    Object.keys(groups).forEach((brand) => {
-      drawGroupTitle(brand);
-
-      groups[brand].forEach((it) => {
-        const boxes = n(it.boxes, 0);
-        const wPer = n(it.weightPerBox, 0);
-        const wTotal = boxes * wPer;
-
-        const price = rate > 0 ? rate : n(it.pricePerKg, 0);
-        const amount = rate > 0 ? wTotal * rate : wTotal * n(it.pricePerKg, 0);
-
-        drawRow({
-          date: "", // ใบตัวอย่างไม่ได้ใส่ date ทุกบรรทัด
-          item: `${s(it.variety)} ${s(it.grade)}`,
-          boxes,
-          wPer,
-          wTotal,
-          price,
-          amount,
-        });
-      });
-
-      y += 4;
-    });
-
-    // ---------- totals ----------
-    doc.save();
-    doc.strokeColor("#c9b28f").lineWidth(1);
-    doc.moveTo(tableX, y + 6).lineTo(tableX + tableW, y + 6).stroke();
-    doc.restore();
-
-    setFont(true).fontSize(12).fillColor(red).text("รวม", tableX + 110, y + 10);
-
-    setFont(true).fontSize(12).fillColor("black");
-    const totalsX = tableX + cols[0].w + cols[1].w;
-
-    doc.text(num(totalBoxes), totalsX, y + 10, { width: cols[2].w, align: "right" });
-    doc.text(num(totalWeight), totalsX + cols[2].w + cols[3].w, y + 10, { width: cols[4].w, align: "right" });
-
-    const lastColX = tableX + cols.slice(0, 6).reduce((sum, c) => sum + c.w, 0);
-    doc.text(money(grandTotal), lastColX, y + 10, { width: cols[6].w, align: "right" });
-
-    // total bar
-    const barY = y + 40;
-    doc.save();
-    doc.rect(tableX, barY, tableW, 26).fill("#f6dfd4");
-    doc.restore();
-
-    setFont(true).fontSize(12).fillColor(red).text("รวมทั้งสิ้น 总计", tableX + 10, barY + 6);
-    setFont(true).fontSize(12).fillColor("black");
-    doc.text(num(totalBoxes), totalsX, barY + 6, { width: cols[2].w, align: "right" });
-    doc.text(num(totalWeight), totalsX + cols[2].w + cols[3].w, barY + 6, { width: cols[4].w, align: "right" });
-    doc.text(money(grandTotal), lastColX, barY + 6, { width: cols[6].w, align: "right" });
-
-    // ---------- note ----------
-    if (invoice.note && String(invoice.note).trim()) {
-      setFont(true).fontSize(14).fillColor(red).text("หมายเหตุ / Note", tableX, barY + 38);
-      setFont(false).fontSize(12).fillColor("black").text(String(invoice.note), tableX, barY + 58, { width: tableW });
-    }
-
-    // ---------- signature ----------
-    const sigY = pageH - 140;
-    doc.save();
-    doc.strokeColor(red).lineWidth(1);
-    doc.rect(tableX, sigY, tableW, 85).stroke();
-    doc.restore();
-
-    setFont(false).fontSize(10).fillColor("black");
-    doc.text("ผู้รับสินค้า / Receiver Signature\nวันที่ / Date", tableX + 20, sigY + 40);
-    doc.text("ผู้มีอำนาจลงนาม / Authorized Signature\nวันที่ / Date", tableX + tableW - 210, sigY + 40);
-
-    doc.end();
+    buildInvoicePDF(res, invoice);
   } catch (err) {
     console.error("❌ GET /v1/invoices/:id/pdf error::", err);
-    res.status(500).json({ error: "เกิดข้อผิดพลาดขณะสร้าง PDF", details: err });
+    res.status(500).json({ error: "เกิดข้อผิดพลาดขณะสร้าง PDF", details: String(err) });
   }
 });
 
