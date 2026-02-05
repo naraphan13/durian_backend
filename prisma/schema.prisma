@@ -272,7 +272,7 @@ model Invoice {
   // ===== ของเดิม (อย่าลบ เพื่อไม่ให้ข้อมูลเก่าหาย) =====
   date          DateTime @default(now())
   rate          Float?
-
+  docType String? @default("INVOICE") // "INVOICE" | "RECEIPT"
   destination   String?
   containerInfo String?   @db.Text
   containerCode String?
@@ -317,7 +317,7 @@ model Invoice {
 
   seasonId     Int?
   season       Season?  @relation(fields: [seasonId], references: [id])
-
+  @@index([docType])
   @@index([date])
   @@index([shipDate])
   @@index([seasonId])
