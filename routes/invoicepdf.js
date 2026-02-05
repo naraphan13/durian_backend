@@ -17,6 +17,10 @@
 //    - จำนวนเงินเป็นตัวอักษรให้มีวงเล็บ (ใน SUMMARY)
 //    - ลายเซ็น: ซ้าย=ผู้วางบิล+วันที่, กลาง=โลโก้, ขวา=ผู้มีอำนาจลงนาม+วันที่ + มีกล่องครอบส่วนเซ็นทั้งหมด
 //
+// ✅ FIX เพิ่มเติม (ตามข้อความล่าสุดของคุณ):
+//    - PDF รองรับขึ้นบรรทัดใหม่จาก \n ใน drawSmartText/heightSmartText
+//    - BILL TO: แสดงชื่อบริษัทไทย/อังกฤษ "คนละบรรทัด" ได้จริง (ไม่บังคับ maxLines=1)
+//
 // Endpoints:
 //   POST   /v1/invoices
 //   GET    /v1/invoices?seasonId=...
@@ -175,7 +179,103 @@ function splitSegments(text) {
   return merged;
 }
 
-// วาดข้อความแบบ segmented ภายในกรอบความกว้างเดียว (ไม่ใช้ doc.text คราวเดียว)
+/**
+ * ✅ NEW: wrap text โดย "รองรับ \n" จริง
+ * - แยกเป็น paragraphs ตาม \n ก่อน
+ * - wrap ทีละ paragraph ด้วย whitespace token
+ * - รักษาบรรทัดว่างได้
+ */
+function buildWrappedLines(doc, loaded, rawText, options = {}) {
+  const { width = 200, bold = false, maxLines = null } = options;
+
+  const raw = String(rawText ?? "");
+  if (!raw) return [];
+
+  const measureToken = (tok) => {
+    const segs = splitSegments(tok);
+    let w = 0;
+    for (const seg of segs) {
+      const wantZh = seg.mode === "zh";
+      const fontName = pickFontName(loaded, wantZh, bold);
+      if (fontName) doc.font(fontName);
+      w += doc.widthOfString(seg.text);
+    }
+    return w;
+  };
+
+  const lines = [];
+  const paragraphs = raw.split(/\r?\n/);
+
+  const pushLineSafe = (line) => {
+    lines.push(line);
+    if (maxLines && lines.length >= maxLines) return false;
+    return true;
+  };
+
+  const wrapParagraph = (para) => {
+    const words = String(para).split(/(\s+)/).filter((w) => w !== "");
+    let current = [];
+    let currentWidth = 0;
+
+    for (const tok of words) {
+      const tokWidth = measureToken(tok);
+
+      // token ยาวมาก -> ตัดทีละตัว
+      if (tokWidth > width && tok.trim() !== "") {
+        if (current.length) {
+          if (!pushLineSafe(current.join(""))) return false;
+          current = [];
+          currentWidth = 0;
+        }
+
+        let temp = "";
+        for (const ch of tok) {
+          const w = measureToken(temp + ch);
+          if (w <= width || temp === "") temp += ch;
+          else {
+            if (!pushLineSafe(temp)) return false;
+            temp = ch;
+          }
+        }
+        if (temp) {
+          if (!pushLineSafe(temp)) return false;
+        }
+        continue;
+      }
+
+      if (currentWidth + tokWidth <= width || current.length === 0) {
+        current.push(tok);
+        currentWidth += tokWidth;
+      } else {
+        if (!pushLineSafe(current.join(""))) return false;
+        current = [tok];
+        currentWidth = tokWidth;
+      }
+    }
+
+    if (current.length) {
+      if (!pushLineSafe(current.join(""))) return false;
+    }
+    return true;
+  };
+
+  for (const para of paragraphs) {
+    if (maxLines && lines.length >= maxLines) break;
+
+    // บรรทัดว่างจากการกด Enter
+    if (String(para).trim() === "") {
+      if (!pushLineSafe("")) break;
+      continue;
+    }
+
+    const ok = wrapParagraph(para);
+    if (!ok) break;
+  }
+
+  return lines;
+}
+
+// วาดข้อความแบบ segmented ภายในกรอบความกว้างเดียว (รองรับ \n)
 function drawSmartText(doc, loaded, text, x, y, options = {}) {
   const {
     width = 200,
@@ -192,68 +292,8 @@ function drawSmartText(doc, loaded, text, x, y, options = {}) {
 
   doc.fillColor(color).fontSize(fontSize);
 
-  const words = raw.split(/(\s+)/).filter((w) => w !== "");
-
-  const lines = [];
-  let current = [];
-  let currentWidth = 0;
-
-  const measureToken = (tok) => {
-    const segs = splitSegments(tok);
-    let w = 0;
-    for (const seg of segs) {
-      const wantZh = seg.mode === "zh";
-      const fontName = pickFontName(loaded, wantZh, bold);
-      if (fontName) doc.font(fontName);
-      w += doc.widthOfString(seg.text);
-    }
-    return w;
-  };
-
-  for (const tok of words) {
-    const tokWidth = measureToken(tok);
-
-    // token ยาวมาก -> ตัดทีละตัว
-    if (tokWidth > width && tok.trim() !== "") {
-      if (current.length) {
-        lines.push(current.join(""));
-        current = [];
-        currentWidth = 0;
-        if (maxLines && lines.length >= maxLines) break;
-      }
-
-      let temp = "";
-      for (const ch of tok) {
-        const w = measureToken(temp + ch);
-        if (w <= width || temp === "") temp += ch;
-        else {
-          lines.push(temp);
-          temp = ch;
-          if (maxLines && lines.length >= maxLines) break;
-        }
-      }
-      if (maxLines && lines.length >= maxLines) break;
-      if (temp) {
-        lines.push(temp);
-        if (maxLines && lines.length >= maxLines) break;
-      }
-      continue;
-    }
-
-    if (currentWidth + tokWidth <= width || current.length === 0) {
-      current.push(tok);
-      currentWidth += tokWidth;
-    } else {
-      lines.push(current.join(""));
-      current = [tok];
-      currentWidth = tokWidth;
-      if (maxLines && lines.length >= maxLines) break;
-    }
-  }
-
-  if ((!maxLines || lines.length < maxLines) && current.length) {
-    lines.push(current.join(""));
-  }
+  // ✅ NEW: รองรับ \n
+  const lines = buildWrappedLines(doc, loaded, raw, { width, bold, maxLines });
 
   const lineH = doc.currentLineHeight(true) + lineGap;
   const totalH = lines.length * lineH;
@@ -261,6 +301,7 @@ function drawSmartText(doc, loaded, text, x, y, options = {}) {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
 
+    // วัดความกว้างบรรทัดเพื่อ align
     let lineW = 0;
     const segsForWidth = splitSegments(line);
     for (const seg of segsForWidth) {
@@ -299,65 +340,8 @@ function heightSmartText(doc, loaded, text, options = {}) {
 
   doc.fontSize(fontSize);
 
-  const words = raw.split(/(\s+)/).filter((w) => w !== "");
-
-  const measureToken = (tok) => {
-    const segs = splitSegments(tok);
-    let w = 0;
-    for (const seg of segs) {
-      const wantZh = seg.mode === "zh";
-      const fontName = pickFontName(loaded, wantZh, bold);
-      if (fontName) doc.font(fontName);
-      w += doc.widthOfString(seg.text);
-    }
-    return w;
-  };
-
-  const lines = [];
-  let current = [];
-  let currentWidth = 0;
-
-  for (const tok of words) {
-    const tokWidth = measureToken(tok);
-
-    if (tokWidth > width && tok.trim() !== "") {
-      if (current.length) {
-        lines.push(current.join(""));
-        current = [];
-        currentWidth = 0;
-        if (maxLines && lines.length >= maxLines) break;
-      }
-
-      let temp = "";
-      for (const ch of tok) {
-        const w = measureToken(temp + ch);
-        if (w <= width || temp === "") temp += ch;
-        else {
-          lines.push(temp);
-          temp = ch;
-          if (maxLines && lines.length >= maxLines) break;
-        }
-      }
-      if (maxLines && lines.length >= maxLines) break;
-      if (temp) {
-        lines.push(temp);
-        if (maxLines && lines.length >= maxLines) break;
-      }
-      continue;
-    }
-
-    if (currentWidth + tokWidth <= width || current.length === 0) {
-      current.push(tok);
-      currentWidth += tokWidth;
-    } else {
-      lines.push(current.join(""));
-      current = [tok];
-      currentWidth = tokWidth;
-      if (maxLines && lines.length >= maxLines) break;
-    }
-  }
-
-  if ((!maxLines || lines.length < maxLines) && current.length) lines.push(current.join(""));
+  // ✅ NEW: รองรับ \n
+  const lines = buildWrappedLines(doc, loaded, raw, { width, bold, maxLines });
 
   const lineH = doc.currentLineHeight(true) + lineGap;
   return lines.length * lineH;
@@ -534,17 +518,48 @@ function buildInvoicePDF(res, invoice) {
   /* ============================= BILL TO + DETAIL (no boxes) ============================= */
   let sectionY = redLineY + 10;
 
-  // one line: "BILL TO: <name>" (company name in same line with bill to)
   const billToName = invoice.billToName || "-";
   const billToTaxId = invoice.billToTaxId || "";
   const billToAddress = invoice.billToAddress || "";
 
-  const billToLine = `BILL TO: ${billToName}`;
-  const billToLineH = heightSmartText(doc, loaded, billToLine, { width: right - left, bold: true, fontSize: 13, lineGap: 1, maxLines: 1 });
-  drawSmartText(doc, loaded, billToLine, left, sectionY, { width: right - left, bold: true, fontSize: 13, maxLines: 1 });
+  // ✅ FIX: BILL TO แยกหัวกับชื่อ (เพื่อรองรับ \n ในชื่อบริษัท)
+  const billToTitle = "BILL TO:";
+  const billToTitleH = heightSmartText(doc, loaded, billToTitle, {
+    width: (right - left) * 0.55,
+    bold: true,
+    fontSize: 13,
+    lineGap: 1,
+    maxLines: 1,
+  });
+  drawSmartText(doc, loaded, billToTitle, left, sectionY, {
+    width: (right - left) * 0.55,
+    bold: true,
+    fontSize: 13,
+    maxLines: 1,
+  });
+
+  // ✅ ชื่อบริษัท/ลูกค้า รองรับขึ้นบรรทัดจาก \n (ไทย/อังกฤษคนละบรรทัด)
+  const nameBlockX = left + 70; // เว้นจาก "BILL TO:" นิดนึง
+  const nameBlockW = (right - left) * 0.55 - 70;
+
+  const billToNameH = heightSmartText(doc, loaded, billToName, {
+    width: nameBlockW,
+    bold: true,
+    fontSize: 13,
+    lineGap: 1,
+    maxLines: 3, // ปรับได้ตามต้องการ
+  });
+  drawSmartText(doc, loaded, billToName, nameBlockX, sectionY, {
+    width: nameBlockW,
+    bold: true,
+    fontSize: 13,
+    lineGap: 1,
+    maxLines: 3,
+  });
 
   // billTo sub lines
-  let by = sectionY + billToLineH + 2;
+  let by = sectionY + Math.max(billToTitleH, billToNameH) + 2;
+
   if (billToTaxId) {
     const t = `Tax ID: ${billToTaxId}`;
     drawSmartText(doc, loaded, t, left, by, { width: (right - left) * 0.55, fontSize: 11, maxLines: 1 });
