@@ -1,11 +1,19 @@
-// invoicepdf.js (FINAL - Full file)
-// ✅ Router ใหม่ “Invoice” แยกจาก ExportContainer 100%
-// ✅ CRUD + Generate PDF (ตาม schema ล่าสุดของคุณ ที่ “เก็บของเดิมไว้ + เพิ่มฟิลด์ใบจริง”)
-// ✅ แก้ปัญหาไทย/จีนเป็นต่างดาว: ใช้ 2 ฟอนต์ + วาด “แบบแบ่งช่วงข้อความ” (segment draw)
-// ✅ แก้ปัญหาข้อความล้นช่อง/ทับบรรทัด: ใช้ doc.heightOfString + block layout (คำนวณความสูงจริง)
-// ✅ โลโก้: preset เท่านั้น (companyLogoKey: logo1/logo2/logo3)  ❌ ไม่มี base64
-// ✅ รองรับ items snapshot (weightTotalKg/unitPrice/amount) ถ้ามี จะใช้ก่อน
-// ✅ รองรับ totals snapshot (totalBoxes/totalWeightKg/subtotalAmount/expenseAmount/grandTotalAmount/amountText) ถ้ามี จะใช้ก่อน
+// invoicepdf.js (NEW VERSION - Single Page Layout + Invoice/Receipt + Compact Header)
+// ✅ Router “Invoice” แยกจาก ExportContainer 100%
+// ✅ CRUD + Generate PDF (รองรับ schema ล่าสุด: docType, shipDate, snapshot totals, items/expenses)
+// ✅ แก้ไทย/จีนเป็นต่างดาว: ใช้ 2 ฟอนต์ + วาดแบบแบ่งช่วงข้อความ (segment draw)
+// ✅ Layout ใหม่ตามที่ขอ:
+//    - ช่อง DETAIL เรียง: เบอร์ตู้, Brand, อุณหภูมิ, วันที่ปล่อย, transport, จำนวนกล่อง, น้ำหนักรวม
+//    - หัวเอกสารเลือกได้: INVOICE / RECEIPT (ใช้ invoice.docType)
+//    - ตัด DATE ที่หัวกระดาษออก (ใช้วันที่ปล่อยใน DETAIL แทน)
+//    - ไม่มีกรอบหัวบิล / ไม่มีกรอบ Bill To & Detail (ประหยัดพื้นที่)
+//    - เส้นสีแดงคั่นหัวกระดาษกับส่วนล่าง แทนกรอบ
+//    - Company Name อยู่บรรทัดเดียวกับ BILL TO
+//    - ตารางเรียงคอลัมน์: เกรด, จำนวนกล่อง, กก./กล่อง, Size, น้ำหนักรวม, ราคา, รวมเงิน
+//    - ค่าใช้จ่ายคำนวณจาก น้ำหนักรวม * rate (rate มาจากฟอร์มหน้าเว็บ = invoice.rate)
+//    - จำนวนเงินเป็นตัวอักษรใส่วงเล็บ
+//    - ลายเซ็นด้านล่างอยู่หน้าเดียว: ซ้าย "ผู้วางบิล + วันที่", ขวา "ผู้มีอำนาจลงนาม + วันที่",
+//      มีโลโก้ตรงกลาง และมีกรอบครอบส่วนเซ็นทั้งหมด
 //
 // Endpoints:
 //   POST   /v1/invoices
@@ -64,7 +72,9 @@ function hasThai(s) {
 }
 function formatNumber(v, digits = 0) {
   const n = safeNumber(v, 0);
-  return digits > 0 ? n.toLocaleString(undefined, { minimumFractionDigits: digits, maximumFractionDigits: digits }) : n.toLocaleString();
+  return digits > 0
+    ? n.toLocaleString(undefined, { minimumFractionDigits: digits, maximumFractionDigits: digits })
+    : n.toLocaleString();
 }
 
 /* ----------------------------- fonts ----------------------------- */
@@ -96,7 +106,7 @@ function registerFonts(doc) {
     loaded.zh.bold = true;
   }
 
-  // default
+  // default font
   if (loaded.th.regular) doc.font("th");
   else if (loaded.zh.regular) doc.font("zh");
 
@@ -120,6 +130,7 @@ function pickFontName(loaded, wantZh, bold) {
   }
 }
 
+/* ----------------------------- smart text (thai+chinese safe) ----------------------------- */
 // ✅ แก้ “บรรทัดเดียวมีไทย+จีนแล้วไทยกลายเป็นต่างดาว”
 // วิธี: แบ่งข้อความเป็นช่วง ๆ (ไทย/จีน/อื่น) แล้ววาดทีละช่วง พร้อมสลับฟอนต์
 function splitSegments(text) {
@@ -143,9 +154,8 @@ function splitSegments(text) {
       buf = ch;
       continue;
     }
-    if (m === mode) {
-      buf += ch;
-    } else {
+    if (m === mode) buf += ch;
+    else {
       segments.push({ text: buf, mode });
       mode = m;
       buf = ch;
@@ -153,7 +163,7 @@ function splitSegments(text) {
   }
   if (buf) segments.push({ text: buf, mode });
 
-  // รวม other ที่ติดกัน
+  // merge adjacent same mode
   const merged = [];
   for (const seg of segments) {
     const last = merged[merged.length - 1];
@@ -163,7 +173,6 @@ function splitSegments(text) {
   return merged;
 }
 
-// วาดข้อความแบบ segmented ภายในกรอบความกว้างเดียว (ไม่ใช้ doc.text คราวเดียว)
 function drawSmartText(doc, loaded, text, x, y, options = {}) {
   const {
     width = 200,
@@ -180,16 +189,9 @@ function drawSmartText(doc, loaded, text, x, y, options = {}) {
 
   doc.fillColor(color).fontSize(fontSize);
 
-  // แยกเป็น "words" แบบง่าย: split ด้วย space แต่ยังรักษา segment ภายใน word
-  // แล้วทำ line-wrap เองด้วย width
-  const words = raw.split(/(\s+)/).filter((w) => w !== ""); // keep spaces as tokens
-
-  const lines = [];
-  let current = [];
-  let currentWidth = 0;
+  const words = raw.split(/(\s+)/).filter((w) => w !== ""); // keep spaces
 
   const measureToken = (tok) => {
-    // tok เป็น string อาจมีไทย/จีน/อื่นผสม -> measure รวมโดยสลับฟอนต์ segment
     const segs = splitSegments(tok);
     let w = 0;
     for (const seg of segs) {
@@ -201,25 +203,26 @@ function drawSmartText(doc, loaded, text, x, y, options = {}) {
     return w;
   };
 
+  const lines = [];
+  let current = [];
+  let currentWidth = 0;
+
   for (const tok of words) {
     const tokWidth = measureToken(tok);
 
-    // ถ้าเป็น token ยาวมากจนเกิน width ให้บังคับตัดทีละตัว (กันล้น)
+    // token too long => force cut by char
     if (tokWidth > width && tok.trim() !== "") {
-      // flush current line ก่อน
       if (current.length) {
         lines.push(current.join(""));
         current = [];
         currentWidth = 0;
         if (maxLines && lines.length >= maxLines) break;
       }
-      // ตัด tok ทีละตัว
       let temp = "";
       for (const ch of tok) {
         const w = measureToken(temp + ch);
-        if (w <= width || temp === "") {
-          temp += ch;
-        } else {
+        if (w <= width || temp === "") temp += ch;
+        else {
           lines.push(temp);
           temp = ch;
           if (maxLines && lines.length >= maxLines) break;
@@ -244,17 +247,15 @@ function drawSmartText(doc, loaded, text, x, y, options = {}) {
     }
   }
 
-  if ((!maxLines || lines.length < maxLines) && current.length) {
-    lines.push(current.join(""));
-  }
+  if ((!maxLines || lines.length < maxLines) && current.length) lines.push(current.join(""));
 
   const lineH = doc.currentLineHeight(true) + lineGap;
   const totalH = lines.length * lineH;
 
-  // วาดแต่ละบรรทัด + align
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    // คำนวณความกว้างบรรทัด
+
+    // calc line width for align
     let lineW = 0;
     const segsForWidth = splitSegments(line);
     for (const seg of segsForWidth) {
@@ -268,7 +269,6 @@ function drawSmartText(doc, loaded, text, x, y, options = {}) {
     if (align === "center") startX = x + (width - lineW) / 2;
     if (align === "right") startX = x + (width - lineW);
 
-    // วาด segment ทีละส่วน
     let cursorX = startX;
     const segs = splitSegments(line);
     for (const seg of segs) {
@@ -288,18 +288,7 @@ function drawSmartText(doc, loaded, text, x, y, options = {}) {
 }
 
 function heightSmartText(doc, loaded, text, options = {}) {
-  // ใช้ logic เหมือน drawSmartText แต่ไม่วาดจริง: ใช้ drawSmartText กับ doc.save/restore แบบง่าย
-  // (pdfkit ไม่มี native measure multiline สำหรับหลายฟอนต์) -> เราคืน height จาก drawSmartText แบบ dry-run ด้วยวิธีที่ปลอดภัย:
-  // เรา "จำลอง" ด้วยการเรียก drawSmartText แต่ไม่เปลี่ยนหน้า (ไม่วาดจริงยาก)
-  // ทางแก้: ทำเหมือน drawSmartText แค่คำนวนจำนวน lines
-  const {
-    width = 200,
-    bold = false,
-    fontSize = 12,
-    lineGap = 2,
-    maxLines = null,
-  } = options;
-
+  const { width = 200, bold = false, fontSize = 12, lineGap = 2, maxLines = null } = options;
   const raw = String(text ?? "");
   if (!raw) return 0;
 
@@ -333,7 +322,6 @@ function heightSmartText(doc, loaded, text, options = {}) {
         currentWidth = 0;
         if (maxLines && lines.length >= maxLines) break;
       }
-
       let temp = "";
       for (const ch of tok) {
         const w = measureToken(temp + ch);
@@ -369,9 +357,10 @@ function heightSmartText(doc, loaded, text, options = {}) {
   return lines.length * lineH;
 }
 
-/* ----------------------------- PDF maker ----------------------------- */
+/* ----------------------------- PDF maker (single page) ----------------------------- */
 function buildInvoicePDF(res, invoice) {
-  const doc = new PDFDocument({ size: "A4", margin: 40 });
+  // margin ลดลงเล็กน้อยเพื่อให้ยัดทุกอย่างอยู่หน้าเดียวง่ายขึ้น
+  const doc = new PDFDocument({ size: "A4", margin: 28 });
 
   const buffers = [];
   doc.on("data", buffers.push.bind(buffers));
@@ -395,7 +384,8 @@ function buildInvoicePDF(res, invoice) {
   const bottom = pageH - doc.page.margins.bottom;
 
   const red = "#cc0000";
-  const gray = "#cccccc";
+  const gray = "#cfcfcf";
+  const lightGray = "#eeeeee";
 
   const logoPresets = {
     logo1: path.join(__dirname, "../picture/S__5275654png (1).png"),
@@ -404,321 +394,43 @@ function buildInvoicePDF(res, invoice) {
   };
   const defaultLogo = path.join(__dirname, "../picture/S__5275654png (1).png");
 
-  // ใช้ shipDate ถ้ามี ไม่งั้น fallback date
-  const usedDate = invoice.shipDate || invoice.date || new Date();
+  const docType = String(invoice.docType || "INVOICE").toUpperCase();
+  const usedShipDate = invoice.shipDate || invoice.date || new Date();
 
-  /* ---------- header box (dynamic height) ---------- */
-  // เราจะทำ header สูงพอสำหรับ address ที่ยาวได้
-  const headerMinH = 120;
-  const headerX = left;
-  const headerY = top;
-  const headerW = right - left;
-
-  // logo
-  let logoDrawn = false;
-  if (invoice.companyLogoKey && logoPresets[invoice.companyLogoKey]) {
-    const p = logoPresets[invoice.companyLogoKey];
-    if (fs.existsSync(p)) {
-      doc.image(p, headerX + 12, headerY + 12, { width: 70 });
-      logoDrawn = true;
-    }
-  }
-  if (!logoDrawn && fs.existsSync(defaultLogo)) {
-    doc.image(defaultLogo, headerX + 12, headerY + 12, { width: 70 });
-  }
-
-  const companyName = invoice.companyName || "SURIYA 388 CO.,LTD.";
-  const companyAddress = invoice.companyAddress || "";
-  const companyTaxId = invoice.companyTaxId || "";
-  const companyPhone = invoice.companyPhone || "";
-
-  // คำนวณความสูง block บริษัท (ชื่อ+ที่อยู่+tax+tel)
-  const companyTextX = headerX + 95;
-  const companyTextW = 320;
-  const companyNameH = heightSmartText(doc, loaded, companyName, { width: companyTextW, bold: true, fontSize: 18, lineGap: 2, maxLines: 2 });
-  const companyAddressH = heightSmartText(doc, loaded, companyAddress, { width: companyTextW, bold: false, fontSize: 12, lineGap: 2, maxLines: 4 });
-  const taxLine = companyTaxId ? `เลขประจำตัวผู้เสียภาษี: ${companyTaxId}` : "";
-  const telLine = companyPhone ? `Tel: ${companyPhone}` : "";
-  const taxH = taxLine ? heightSmartText(doc, loaded, taxLine, { width: companyTextW, fontSize: 12, lineGap: 2 }) : 0;
-  const telH = telLine ? heightSmartText(doc, loaded, telLine, { width: companyTextW, fontSize: 12, lineGap: 2 }) : 0;
-
-  const companyBlockH = 10 + companyNameH + companyAddressH + taxH + telH + 8;
-  const headerH = Math.max(headerMinH, companyBlockH + 20);
-
-  // วาดกรอบ header
-  doc.roundedRect(headerX, headerY, headerW, headerH, 10).lineWidth(1).stroke(gray);
-
-  // วาด company text แบบ smart
-  let cy = headerY + 12;
-  drawSmartText(doc, loaded, companyName, companyTextX, cy, {
-    width: companyTextW,
-    bold: true,
-    fontSize: 18,
-    color: "#000000",
-    maxLines: 2,
-  });
-  cy += companyNameH;
-
-  drawSmartText(doc, loaded, companyAddress, companyTextX, cy, {
-    width: companyTextW,
-    bold: false,
-    fontSize: 12,
-    color: "#000000",
-    maxLines: 4,
-  });
-  cy += companyAddressH;
-
-  if (taxLine) {
-    drawSmartText(doc, loaded, taxLine, companyTextX, cy, {
-      width: companyTextW,
-      fontSize: 12,
-    });
-    cy += taxH;
-  }
-  if (telLine) {
-    drawSmartText(doc, loaded, telLine, companyTextX, cy, {
-      width: companyTextW,
-      fontSize: 12,
-    });
-    cy += telH;
-  }
-
-  // INVOICE title right
-  drawSmartText(doc, loaded, "INVOICE", right - 170, headerY + 12, {
-    width: 170,
-    align: "right",
-    bold: true,
-    fontSize: 24,
-    color: red,
-  });
-
-  const line1 = `DATE: ${thDate(usedDate)}`;
-  const line2 = `NO: #${invoice.invoiceNo || 1}`;
-
-  drawSmartText(doc, loaded, line1, right - 220, headerY + 48, { width: 220, align: "right", fontSize: 12 });
-  drawSmartText(doc, loaded, line2, right - 220, headerY + 66, { width: 220, align: "right", fontSize: 12 });
-
-  /* ---------- BILL TO + DETAIL (dynamic height to avoid overlap) ---------- */
-  let sectionY = headerY + headerH + 16;
-
-  const billBoxW = (right - left) * 0.55 - 6;
-  const metaX = left + (right - left) * 0.55 + 6;
-  const metaW = right - metaX;
-
-  const billToName = invoice.billToName || "-";
-  const billToTaxId = invoice.billToTaxId || "";
-  const billToAddress = invoice.billToAddress || "";
-
-  // detail fields (ใหม่)
-  const route = invoice.route || invoice.destination || "-"; // ถ้ายังไม่ใช้ route ให้ fallback destination
-  const temperature = invoice.temperature || "-";
-  const transport = invoice.transport || "-";
-  const brandRemark = invoice.brandRemark || "-";
-
-  const metaLines = [
-    `Route: ${route}`, // 陆运/海运
-    `Temp: ${temperature}`, // 温度
-    `Transport: ${transport}`, // 铁路/WMK
-    `Brand: ${brandRemark}`,
-    `Container: ${invoice.containerInfo || "-"}`,
-    `Container Code: ${invoice.containerCode || "-"}`,
-    `Reference: ${invoice.refCode || "-"}`,
-  ];
-
-  // คำนวณความสูง BillTo
-  const billTitleH = heightSmartText(doc, loaded, "BILL TO", { width: billBoxW - 24, bold: true, fontSize: 14, lineGap: 2 });
-  const billNameH = heightSmartText(doc, loaded, billToName, { width: billBoxW - 24, fontSize: 12, lineGap: 2, maxLines: 3 });
-  const billTaxLine = billToTaxId ? `Tax ID: ${billToTaxId}` : "";
-  const billTaxH = billTaxLine ? heightSmartText(doc, loaded, billTaxLine, { width: billBoxW - 24, fontSize: 12, lineGap: 2 }) : 0;
-  const billAddrH = billToAddress ? heightSmartText(doc, loaded, billToAddress, { width: billBoxW - 24, fontSize: 12, lineGap: 2, maxLines: 6 }) : 0;
-
-  const billInnerH = 10 + billTitleH + 6 + billNameH + (billTaxLine ? 2 + billTaxH : 0) + (billToAddress ? 2 + billAddrH : 0) + 10;
-
-  // คำนวณความสูง Detail
-  const metaTitleH = heightSmartText(doc, loaded, "DETAIL", { width: metaW - 24, bold: true, fontSize: 14, lineGap: 2 });
-  let metaLinesH = 0;
-  for (const t of metaLines) {
-    metaLinesH += heightSmartText(doc, loaded, t, { width: metaW - 24, fontSize: 12, lineGap: 2, maxLines: 2 });
-  }
-  const metaInnerH = 10 + metaTitleH + 6 + metaLinesH + 10;
-
-  const blockH = Math.max(110, Math.max(billInnerH, metaInnerH));
-
-  // Bill To box
-  doc.roundedRect(left, sectionY, billBoxW, blockH, 10).lineWidth(1).stroke(gray);
-  drawSmartText(doc, loaded, "BILL TO", left + 12, sectionY + 10, { width: billBoxW - 24, bold: true, fontSize: 14 });
-
-  let by = sectionY + 10 + billTitleH + 6;
-  drawSmartText(doc, loaded, billToName, left + 12, by, { width: billBoxW - 24, fontSize: 12, maxLines: 3 });
-  by += billNameH;
-
-  if (billTaxLine) {
-    by += 2;
-    drawSmartText(doc, loaded, billTaxLine, left + 12, by, { width: billBoxW - 24, fontSize: 12 });
-    by += billTaxH;
-  }
-
-  if (billToAddress) {
-    by += 2;
-    drawSmartText(doc, loaded, billToAddress, left + 12, by, { width: billBoxW - 24, fontSize: 12, maxLines: 6 });
-    by += billAddrH;
-  }
-
-  // Detail box
-  doc.roundedRect(metaX, sectionY, metaW, blockH, 10).lineWidth(1).stroke(gray);
-  drawSmartText(doc, loaded, "DETAIL", metaX + 12, sectionY + 10, { width: metaW - 24, bold: true, fontSize: 14 });
-
-  let my = sectionY + 10 + metaTitleH + 6;
-  for (const t of metaLines) {
-    drawSmartText(doc, loaded, t, metaX + 12, my, { width: metaW - 24, fontSize: 12, maxLines: 2 });
-    my += heightSmartText(doc, loaded, t, { width: metaW - 24, fontSize: 12, lineGap: 2, maxLines: 2 });
-  }
-
-  /* ---------- Items Table ---------- */
-  let tableY = sectionY + blockH + 16;
-
-  const tableW = right - left;
-
-  // columns fit A4
-  const baseCols = [
-    { title: "วันที่ซื้อ", w: 60, align: "left" }, // purchaseDate
-    { title: "แบรนด์/รายการ", w: 160, align: "left" },
-    { title: "เกรด", w: 40, align: "center" },
-    { title: "Size", w: 38, align: "center" },
-    { title: "กล่อง", w: 50, align: "right" },
-    { title: "กก./กล่อง", w: 60, align: "right" },
-    { title: "น้ำหนักรวม", w: 65, align: "right" },
-    { title: "ราคา", w: 50, align: "right" },
-    { title: "รวมเงิน", w: 62, align: "right" },
-  ];
-  const baseSum = baseCols.reduce((s, c) => s + c.w, 0);
-  const scale = tableW / baseSum;
-  const cols = baseCols.map((c) => ({ ...c, w: Math.floor(c.w * scale) }));
-  const wSum = cols.reduce((s, c) => s + c.w, 0);
-  cols[cols.length - 1].w += tableW - wSum;
-
-  const rowH = 22;
-  const headerH2 = 26;
-
-  const ensureSpace = (neededH) => {
-    if (tableY + neededH > bottom) {
-      doc.addPage();
-      registerFonts(doc);
-      tableY = doc.page.margins.top;
-      drawTableHeader();
-    }
-  };
-
-  const drawTableHeader = () => {
-    doc.rect(left, tableY, tableW, headerH2).fill(red);
-    // header text
-    let x = left;
-    for (const c of cols) {
-      drawSmartText(doc, loaded, c.title, x + 4, tableY + 6, {
-        width: c.w - 8,
-        align: "center",
-        bold: true,
-        fontSize: 10,
-        color: "#ffffff",
-      });
-      x += c.w;
-    }
-    tableY += headerH2;
-  };
-
-  drawTableHeader();
-
-  const drawRow = (values, stripe) => {
-    ensureSpace(rowH + 2);
-
-    if (stripe) doc.rect(left, tableY, tableW, rowH).fill("#f7f7f7");
-
-    // grid
-    doc.rect(left, tableY, tableW, rowH).lineWidth(0.5).stroke("#dddddd");
-
-    let x = left;
-    for (let i = 0; i < cols.length; i++) {
-      const c = cols[i];
-      const txt = String(values[i] ?? "");
-      drawSmartText(doc, loaded, txt, x + 4, tableY + 6, {
-        width: c.w - 8,
-        align: c.align || "left",
-        fontSize: 10,
-        color: "#000000",
-        maxLines: 1, // ✅ กัน overflow ในตาราง
-      });
-      x += c.w;
-      doc.moveTo(x, tableY).lineTo(x, tableY + rowH).lineWidth(0.5).stroke("#dddddd");
-    }
-
-    tableY += rowH;
-  };
-
-  // compute per row, prefer snapshot
+  // ===== compute totals (prefer snapshot) =====
   const items = Array.isArray(invoice.items) ? invoice.items : [];
-  const rate = safeNumber(invoice.rate, 0);
+  const rate = safeNumber(invoice.rate, 0); // ✅ rate = เรทค่าใช้จ่าย
 
   let totalBoxes = 0;
   let totalWeight = 0;
   let subtotal = 0;
 
-  items.forEach((it, idx) => {
+  items.forEach((it) => {
     const boxes = safeNumber(it.boxes, 0);
     const wPerBox = safeNumber(it.weightPerBox, 0);
 
-    const snapshotWeight = safeNumber(it.weightTotalKg, 0);
-    const computedWeight = boxes * wPerBox;
-    const weightTotal = snapshotWeight > 0 ? snapshotWeight : computedWeight;
+    const snapW = safeNumber(it.weightTotalKg, 0);
+    const wTotal = snapW > 0 ? snapW : boxes * wPerBox;
 
-    const snapshotUnit = safeNumber(it.unitPrice, 0);
-    const computedUnit = rate > 0 ? rate : safeNumber(it.pricePerKg, 0);
-    const unitPrice = snapshotUnit > 0 ? snapshotUnit : computedUnit;
-
-    const snapshotAmount = safeNumber(it.amount, 0);
-    const computedAmount = weightTotal * unitPrice;
-    const amount = snapshotAmount > 0 ? snapshotAmount : computedAmount;
+    const unit = safeNumber(it.unitPrice, safeNumber(it.pricePerKg, 0));
+    const snapAmt = safeNumber(it.amount, 0);
+    const amt = snapAmt > 0 ? snapAmt : wTotal * unit;
 
     totalBoxes += boxes;
-    totalWeight += weightTotal;
-    subtotal += amount;
-
-    const purchaseDate = it.purchaseDate ? toISODate(it.purchaseDate) : toISODate(usedDate);
-    const itemName = `${it.brand ? it.brand + " " : ""}${it.variety || ""}`.trim() || "-";
-    const grade = it.grade || "-";
-    const size = it.boxSize || "-";
-
-    drawRow(
-      [
-        purchaseDate,
-        itemName,
-        grade,
-        size,
-        boxes ? formatNumber(boxes) : "",
-        wPerBox ? formatNumber(wPerBox) : "",
-        weightTotal ? formatNumber(weightTotal) : "",
-        unitPrice ? formatNumber(unitPrice) : "",
-        amount ? formatNumber(amount) : "",
-      ],
-      idx % 2 === 1
-    );
+    totalWeight += wTotal;
+    subtotal += amt;
   });
 
-  // If totals snapshot exists, use it
   const snapTotalBoxes = safeNumber(invoice.totalBoxes, 0);
   const snapTotalWeight = safeNumber(invoice.totalWeightKg, 0);
   const snapSubtotal = safeNumber(invoice.subtotalAmount, 0);
 
-  if (snapTotalBoxes > 0 || snapTotalWeight > 0 || snapSubtotal > 0) {
-    totalBoxes = snapTotalBoxes > 0 ? snapTotalBoxes : totalBoxes;
-    totalWeight = snapTotalWeight > 0 ? snapTotalWeight : totalWeight;
-    subtotal = snapSubtotal > 0 ? snapSubtotal : subtotal;
-  }
+  if (snapTotalBoxes > 0) totalBoxes = snapTotalBoxes;
+  if (snapTotalWeight > 0) totalWeight = snapTotalWeight;
+  if (snapSubtotal > 0) subtotal = snapSubtotal;
 
-  /* ---------- Expense section (ถ้ามี) ---------- */
-  const expenses = Array.isArray(invoice.expenses) ? invoice.expenses : [];
-  let expenseTotal = expenses.reduce((s, e) => s + safeNumber(e.amount, 0), 0);
-
-  // snapshot expense
+  // ✅ ค่าใช้จ่าย = น้ำหนักรวม * rate (มาจากฟอร์ม)
+  let expenseTotal = totalWeight * rate;
   const snapExpense = safeNumber(invoice.expenseAmount, 0);
   if (snapExpense > 0) expenseTotal = snapExpense;
 
@@ -726,177 +438,391 @@ function buildInvoicePDF(res, invoice) {
   const snapGrand = safeNumber(invoice.grandTotalAmount, 0);
   if (snapGrand > 0) grandTotal = snapGrand;
 
-  // TOTAL row (table footer)
-  ensureSpace(80);
+  // amount text (ต้องมีวงเล็บ)
+  const dbAmountText = invoice.amountText ? String(invoice.amountText) : "";
+  const amountText =
+    dbAmountText && dbAmountText.trim()
+      ? dbAmountText.trim().startsWith("(")
+        ? dbAmountText.trim()
+        : `(${dbAmountText.trim()})`
+      : "";
 
-  doc.rect(left, tableY, tableW, rowH).fill(red);
+  // ===== header (no frame) =====
+  let y = top;
 
-  // label spans first columns
-  const spanW = cols[0].w + cols[1].w + cols[2].w + cols[3].w;
-  drawSmartText(doc, loaded, "TOTAL", left + 6, tableY + 5, {
-    width: spanW - 12,
-    align: "left",
+  // logo (small)
+  const logoKey = invoice.companyLogoKey;
+  const logoPath =
+    (logoKey && logoPresets[logoKey] && fs.existsSync(logoPresets[logoKey]) && logoPresets[logoKey]) ||
+    (fs.existsSync(defaultLogo) ? defaultLogo : null);
+
+  const logoW = 46;
+  if (logoPath) {
+    try {
+      doc.image(logoPath, left, y, { width: logoW });
+    } catch (_) {}
+  }
+
+  // CompanyName (left) + BILL TO (right) same line
+  const companyName = invoice.companyName || "SURIYA 388 CO.,LTD.";
+  const billToName = invoice.billToName || "-";
+
+  const headerLineY = y + 2;
+  const companyX = left + (logoPath ? logoW + 10 : 0);
+  const companyW = (right - companyX) * 0.55;
+  const billToW = (right - companyX) * 0.45;
+
+  drawSmartText(doc, loaded, companyName, companyX, headerLineY, {
+    width: companyW,
     bold: true,
-    fontSize: 12,
-    color: "#ffffff",
+    fontSize: 13,
     maxLines: 1,
   });
 
-  // write totals into specific columns
+  drawSmartText(doc, loaded, `BILL TO: ${billToName}`, companyX + companyW, headerLineY, {
+    width: billToW,
+    align: "right",
+    bold: true,
+    fontSize: 13,
+    maxLines: 1,
+  });
+
+  // Doc type (top-right) + NO
+  drawSmartText(doc, loaded, docType, right - 200, y, {
+    width: 200,
+    align: "right",
+    bold: true,
+    fontSize: 22,
+    color: red,
+    maxLines: 1,
+  });
+
+  drawSmartText(doc, loaded, `NO: #${invoice.invoiceNo || 1}`, right - 200, y + 24, {
+    width: 200,
+    align: "right",
+    fontSize: 11,
+    maxLines: 1,
+  });
+
+  // addresses/tax lines (compact, no box)
+  const companyAddress = invoice.companyAddress || "";
+  const companyTaxId = invoice.companyTaxId ? `Tax ID: ${invoice.companyTaxId}` : "";
+  const companyPhone = invoice.companyPhone ? `Tel: ${invoice.companyPhone}` : "";
+
+  const billToAddress = invoice.billToAddress || "";
+  const billToTaxId = invoice.billToTaxId ? `Tax ID: ${invoice.billToTaxId}` : "";
+
+  const addrY = y + 18;
+  drawSmartText(doc, loaded, companyAddress, companyX, addrY, {
+    width: companyW,
+    fontSize: 10,
+    maxLines: 2,
+  });
+  drawSmartText(doc, loaded, billToAddress, companyX + companyW, addrY, {
+    width: billToW,
+    align: "right",
+    fontSize: 10,
+    maxLines: 2,
+  });
+
+  const taxY = y + 42;
+  const leftTaxLine = [companyTaxId, companyPhone].filter(Boolean).join(" | ");
+  const rightTaxLine = billToTaxId;
+
+  drawSmartText(doc, loaded, leftTaxLine, companyX, taxY, {
+    width: companyW,
+    fontSize: 10,
+    maxLines: 1,
+  });
+  drawSmartText(doc, loaded, rightTaxLine, companyX + companyW, taxY, {
+    width: billToW,
+    align: "right",
+    fontSize: 10,
+    maxLines: 1,
+  });
+
+  // red divider line (แทนกรอบ)
+  const dividerY = y + 58;
+  doc.moveTo(left, dividerY).lineTo(right, dividerY).lineWidth(2).stroke(red);
+
+  y = dividerY + 8;
+
+  // ===== DETAIL (no box) =====
+  // เรียงตามที่ขอ: เบอร์ตู้ Brand อุณหภูมิ วันที่ปล่อย transport จำนวนกล่อง น้ำหนักรวม
+  // หมายเหตุ: "Brand" ใช้ brandRemark ตามของเดิมที่คุณส่งมา
+  const detailLeftX = left;
+  const detailRightX = left + (right - left) * 0.55;
+  const detailColW = (right - left) * 0.45;
+
+  const d1 = `เบอร์ตู้: ${invoice.containerCode || "-"}`;
+  const d2 = `Brand: ${invoice.brandRemark || "-"}`;
+  const d3 = `อุณหภูมิ: ${invoice.temperature || "-"}`;
+  const d4 = `วันที่ปล่อย: ${thDate(usedShipDate)}`;
+  const d5 = `Transport: ${invoice.transport || "-"}`;
+  const d6 = `จำนวนกล่อง: ${formatNumber(totalBoxes)}`;
+  const d7 = `น้ำหนักรวม: ${formatNumber(totalWeight)} KG`;
+
+  // วาง 2 คอลัมน์ประหยัดพื้นที่
+  const leftLines = [d1, d2, d3, d4];
+  const rightLines = [d5, d6, d7];
+
+  const detailFont = 11;
+  const lineGap = 1;
+
+  let dyL = y;
+  for (const t of leftLines) {
+    drawSmartText(doc, loaded, t, detailLeftX, dyL, { width: (right - left) * 0.55 - 10, fontSize: detailFont, maxLines: 1, lineGap });
+    dyL += heightSmartText(doc, loaded, t, { width: (right - left) * 0.55 - 10, fontSize: detailFont, maxLines: 1, lineGap });
+  }
+
+  let dyR = y;
+  for (const t of rightLines) {
+    drawSmartText(doc, loaded, t, detailRightX, dyR, { width: detailColW, fontSize: detailFont, align: "right", maxLines: 1, lineGap });
+    dyR += heightSmartText(doc, loaded, t, { width: detailColW, fontSize: detailFont, maxLines: 1, lineGap });
+  }
+
+  y = Math.max(dyL, dyR) + 8;
+
+  // ===== table (single page, truncate if too many rows) =====
+  const tableW = right - left;
+
+  const colsBase = [
+    { title: "เกรด", w: 70, align: "center" },
+    { title: "จำนวนกล่อง", w: 85, align: "right" },
+    { title: "กก./กล่อง", w: 85, align: "right" },
+    { title: "Size", w: 60, align: "center" },
+    { title: "น้ำหนักรวม", w: 90, align: "right" },
+    { title: "ราคา", w: 80, align: "right" },
+    { title: "รวมเงิน", w: 95, align: "right" },
+  ];
+
+  // scale to fit width
+  const baseSum = colsBase.reduce((s, c) => s + c.w, 0);
+  const scale = tableW / baseSum;
+  const cols = colsBase.map((c) => ({ ...c, w: Math.floor(c.w * scale) }));
+  const sumW = cols.reduce((s, c) => s + c.w, 0);
+  cols[cols.length - 1].w += tableW - sumW;
+
+  const headerH = 22;
+  const rowH = 18;
+  const tableFont = 9;
+
+  // reserve bottom: signature box + gap
+  const sigBoxH = 95;
+  const sigGap = 10;
+
+  // reserve summary area above signature
+  const summaryH = 62; // compact fixed
+  const reserveBottom = sigBoxH + sigGap;
+
+  // table area limit
+  const tableBottomLimit = bottom - reserveBottom - summaryH - 8;
+
+  const drawTableHeader = () => {
+    doc.rect(left, y, tableW, headerH).fill(red);
+    let x = left;
+    for (const c of cols) {
+      drawSmartText(doc, loaded, c.title, x + 4, y + 5, {
+        width: c.w - 8,
+        align: "center",
+        bold: true,
+        fontSize: 10,
+        color: "#ffffff",
+        maxLines: 1,
+      });
+      x += c.w;
+    }
+    y += headerH;
+  };
+
+  const drawRow = (values, stripe) => {
+    if (stripe) doc.rect(left, y, tableW, rowH).fill("#f8f8f8");
+
+    doc.rect(left, y, tableW, rowH).lineWidth(0.5).stroke("#dddddd");
+
+    let x = left;
+    for (let i = 0; i < cols.length; i++) {
+      const c = cols[i];
+      const txt = String(values[i] ?? "");
+      drawSmartText(doc, loaded, txt, x + 4, y + 4, {
+        width: c.w - 8,
+        align: c.align,
+        fontSize: tableFont,
+        maxLines: 1,
+      });
+      x += c.w;
+      doc.moveTo(x, y).lineTo(x, y + rowH).lineWidth(0.5).stroke("#dddddd");
+    }
+
+    y += rowH;
+  };
+
+  drawTableHeader();
+
+  // max rows allowed (single page)
+  const availableForRows = tableBottomLimit - y;
+  const maxRows = Math.max(0, Math.floor(availableForRows / rowH));
+
+  const rowsToDraw = items.slice(0, maxRows);
+  rowsToDraw.forEach((it, idx) => {
+    const boxes = safeNumber(it.boxes, 0);
+    const wPerBox = safeNumber(it.weightPerBox, 0);
+    const snapW = safeNumber(it.weightTotalKg, 0);
+    const wTotal = snapW > 0 ? snapW : boxes * wPerBox;
+
+    const unit = safeNumber(it.unitPrice, safeNumber(it.pricePerKg, 0));
+    const snapAmt = safeNumber(it.amount, 0);
+    const amt = snapAmt > 0 ? snapAmt : wTotal * unit;
+
+    drawRow(
+      [
+        it.grade || "-",
+        boxes ? formatNumber(boxes) : "",
+        wPerBox ? formatNumber(wPerBox) : "",
+        it.boxSize || "-",
+        wTotal ? formatNumber(wTotal) : "",
+        unit ? formatNumber(unit) : "",
+        amt ? formatNumber(amt) : "",
+      ],
+      idx % 2 === 1
+    );
+  });
+
+  // if truncated, show note line
+  if (items.length > rowsToDraw.length) {
+    const note = `… แสดง ${rowsToDraw.length} รายการจากทั้งหมด ${items.length} รายการ (รายการเยอะเกิน 1 หน้า)`;
+    doc.rect(left, y, tableW, 16).fill(lightGray);
+    drawSmartText(doc, loaded, note, left + 6, y + 3, {
+      width: tableW - 12,
+      fontSize: 9,
+      maxLines: 1,
+    });
+    y += 18;
+  }
+
+  // TOTAL row (table footer) - compact
+  if (y + rowH + 6 > tableBottomLimit) {
+    // ถ้าใกล้ชน summary มาก ให้ขยับขึ้นเล็กน้อย (ไม่ addPage)
+    y = tableBottomLimit - (rowH + 6);
+  }
+
+  doc.rect(left, y, tableW, rowH).fill(red);
+
+  // write totals aligned into columns:
+  // columns index: 1 boxes, 4 weight, 6 amount
   let x = left;
   for (let i = 0; i < cols.length; i++) {
     const c = cols[i];
-    if (i === 4) {
-      drawSmartText(doc, loaded, formatNumber(totalBoxes), x + 4, tableY + 5, {
+    if (i === 0) {
+      drawSmartText(doc, loaded, "TOTAL", x + 6, y + 4, {
+        width: c.w - 12,
+        align: "left",
+        bold: true,
+        fontSize: 11,
+        color: "#ffffff",
+        maxLines: 1,
+      });
+    }
+    if (i === 1) {
+      drawSmartText(doc, loaded, formatNumber(totalBoxes), x + 4, y + 4, {
         width: c.w - 8,
         align: "right",
         bold: true,
-        fontSize: 12,
+        fontSize: 11,
         color: "#ffffff",
+        maxLines: 1,
+      });
+    }
+    if (i === 4) {
+      drawSmartText(doc, loaded, formatNumber(totalWeight), x + 4, y + 4, {
+        width: c.w - 8,
+        align: "right",
+        bold: true,
+        fontSize: 11,
+        color: "#ffffff",
+        maxLines: 1,
       });
     }
     if (i === 6) {
-      drawSmartText(doc, loaded, formatNumber(totalWeight), x + 4, tableY + 5, {
+      drawSmartText(doc, loaded, formatNumber(subtotal), x + 4, y + 4, {
         width: c.w - 8,
         align: "right",
         bold: true,
-        fontSize: 12,
+        fontSize: 11,
         color: "#ffffff",
-      });
-    }
-    if (i === 8) {
-      drawSmartText(doc, loaded, formatNumber(subtotal), x + 4, tableY + 5, {
-        width: c.w - 8,
-        align: "right",
-        bold: true,
-        fontSize: 12,
-        color: "#ffffff",
+        maxLines: 1,
       });
     }
     x += c.w;
   }
 
-  tableY += rowH + 12;
+  y += rowH + 8;
 
-  /* ---------- Expenses list + totals summary (right aligned box) ---------- */
-  const summaryW = 260;
-  const summaryX = right - summaryW;
-  const summaryTitle = "SUMMARY";
+  // ===== summary (compact, fixed) =====
+  // วางก่อน signature เพื่อบังคับ 1 หน้า
+  const summaryX = right - 290;
+  const summaryW = 290;
 
-  const summaryLines = [];
-  summaryLines.push({ label: "Subtotal (ค่าสินค้า)", value: subtotal });
-  summaryLines.push({ label: "Expenses (ค่าใช้จ่าย)", value: expenseTotal });
-  summaryLines.push({ label: "Grand Total (รวมทั้งสิ้น)", value: grandTotal });
-
-  // วัดความสูง summary
-  const titleH = heightSmartText(doc, loaded, summaryTitle, { width: summaryW - 24, bold: true, fontSize: 14, lineGap: 2 });
-  let linesH = 0;
-  for (const ln of summaryLines) {
-    const t = `${ln.label}: ${formatNumber(ln.value)}`;
-    linesH += heightSmartText(doc, loaded, t, { width: summaryW - 24, fontSize: 12, lineGap: 2, maxLines: 2 });
-  }
-  const amountText = invoice.amountText ? String(invoice.amountText) : "";
-  const amountTextH = amountText ? heightSmartText(doc, loaded, amountText, { width: summaryW - 24, fontSize: 12, lineGap: 2, maxLines: 4 }) : 0;
-
-  const summaryH = 12 + titleH + 8 + linesH + (amountText ? 10 + amountTextH : 0) + 12;
-
-  // ensure space
-  if (tableY + summaryH > bottom) {
-    doc.addPage();
-    registerFonts(doc);
-    tableY = doc.page.margins.top;
+  // clamp summary start
+  if (y + summaryH > bottom - reserveBottom) {
+    y = bottom - reserveBottom - summaryH;
   }
 
-  doc.roundedRect(summaryX, tableY, summaryW, summaryH, 10).lineWidth(1).stroke(gray);
+  // frame summary (กล่องเล็ก ๆ ได้ เพราะไม่ได้ขอเอาออก)
+  doc.roundedRect(summaryX, y, summaryW, summaryH, 8).lineWidth(1).stroke(gray);
 
-  drawSmartText(doc, loaded, summaryTitle, summaryX + 12, tableY + 10, { width: summaryW - 24, bold: true, fontSize: 14 });
-  let sy = tableY + 10 + titleH + 8;
+  drawSmartText(doc, loaded, "SUMMARY", summaryX + 10, y + 8, { width: summaryW - 20, bold: true, fontSize: 12, maxLines: 1 });
 
-  for (const ln of summaryLines) {
-    const t = `${ln.label}: ${formatNumber(ln.value)}`;
-    drawSmartText(doc, loaded, t, summaryX + 12, sy, { width: summaryW - 24, fontSize: 12, maxLines: 2 });
-    sy += heightSmartText(doc, loaded, t, { width: summaryW - 24, fontSize: 12, lineGap: 2, maxLines: 2 });
+  const s1 = `Subtotal: ${formatNumber(subtotal)}`;
+  const s2 = `Expense (Weight×Rate): ${formatNumber(expenseTotal)}  (Rate: ${formatNumber(rate)})`;
+  const s3 = `Grand Total: ${formatNumber(grandTotal)}`;
+
+  drawSmartText(doc, loaded, s1, summaryX + 10, y + 26, { width: summaryW - 20, fontSize: 10, maxLines: 1 });
+  drawSmartText(doc, loaded, s2, summaryX + 10, y + 38, { width: summaryW - 20, fontSize: 9, maxLines: 1 });
+  drawSmartText(doc, loaded, s3, summaryX + 10, y + 50, { width: summaryW - 20, fontSize: 10, bold: true, maxLines: 1 });
+
+  // amount text (ใต้ summary ซ้ายให้พอดีหน้าเดียว)
+  const amountX = left;
+  const amountW = summaryX - left - 10;
+  const amountY = y + 28; // วางระดับเดียวกับ summary เพื่อประหยัดที่
+
+  if (amountText && amountW > 120) {
+    drawSmartText(doc, loaded, `จำนวนเงินเป็นตัวอักษร ${amountText}`, amountX, amountY, {
+      width: amountW,
+      fontSize: 10,
+      maxLines: 2,
+    });
   }
 
-  if (amountText) {
-    sy += 10;
-    drawSmartText(doc, loaded, "จำนวนเงินเป็นตัวอักษร", summaryX + 12, sy, { width: summaryW - 24, bold: true, fontSize: 12 });
-    sy += heightSmartText(doc, loaded, "จำนวนเงินเป็นตัวอักษร", { width: summaryW - 24, bold: true, fontSize: 12, lineGap: 2 });
+  // ===== signature block (boxed, with center logo) =====
+  const sigBoxY = bottom - sigBoxH;
+  doc.rect(left, sigBoxY, right - left, sigBoxH).lineWidth(1).stroke(gray);
 
-    drawSmartText(doc, loaded, amountText, summaryX + 12, sy, { width: summaryW - 24, fontSize: 12, maxLines: 4 });
-    sy += amountTextH;
+  const colW = (right - left) / 3;
+  const leftX = left;
+  const midX = left + colW;
+  const rightX = left + colW * 2;
+
+  const signDate = thDate(usedShipDate);
+
+  // left - ผู้วางบิล
+  drawSmartText(doc, loaded, "ผู้วางบิล", leftX, sigBoxY + 10, { width: colW, align: "center", fontSize: 12, bold: true, maxLines: 1 });
+  drawSmartText(doc, loaded, `วันที่ ${signDate}`, leftX, sigBoxY + 26, { width: colW, align: "center", fontSize: 10, maxLines: 1 });
+  doc.moveTo(leftX + 24, sigBoxY + 64).lineTo(leftX + colW - 24, sigBoxY + 64).stroke("#000");
+
+  // right - ผู้มีอำนาจลงนาม
+  drawSmartText(doc, loaded, "ผู้มีอำนาจลงนาม", rightX, sigBoxY + 10, { width: colW, align: "center", fontSize: 12, bold: true, maxLines: 1 });
+  drawSmartText(doc, loaded, `วันที่ ${signDate}`, rightX, sigBoxY + 26, { width: colW, align: "center", fontSize: 10, maxLines: 1 });
+  doc.moveTo(rightX + 24, sigBoxY + 64).lineTo(rightX + colW - 24, sigBoxY + 64).stroke("#000");
+
+  // middle - logo
+  if (logoPath) {
+    try {
+      doc.image(logoPath, midX + (colW - 52) / 2, sigBoxY + 22, { width: 52 });
+    } catch (_) {}
+  } else {
+    drawSmartText(doc, loaded, "-", midX, sigBoxY + 40, { width: colW, align: "center", fontSize: 12 });
   }
-
-  tableY += summaryH + 12;
-
-  /* ---------- Expenses block (left) ---------- */
-  if (expenses.length > 0) {
-    const expBoxW = summaryX - left - 12;
-    const expBoxX = left;
-    const expTitle = "EXPENSES / ค่าใช้จ่าย";
-    const expTitleH = heightSmartText(doc, loaded, expTitle, { width: expBoxW - 24, bold: true, fontSize: 14, lineGap: 2 });
-
-    let expLinesH = 0;
-    for (const e of expenses) {
-      const line = `${e.label}: ${formatNumber(e.amount)}`;
-      expLinesH += heightSmartText(doc, loaded, line, { width: expBoxW - 24, fontSize: 12, lineGap: 2, maxLines: 2 });
-    }
-    const expH = Math.max(90, 12 + expTitleH + 8 + expLinesH + 12);
-
-    // ensure space (use current y ~ tableY - summaryH - 12? we want align with summary top)
-    const expTopY = tableY - (summaryH + 12);
-
-    doc.roundedRect(expBoxX, expTopY, expBoxW, expH, 10).lineWidth(1).stroke(gray);
-    drawSmartText(doc, loaded, expTitle, expBoxX + 12, expTopY + 10, { width: expBoxW - 24, bold: true, fontSize: 14 });
-
-    let ey = expTopY + 10 + expTitleH + 8;
-    for (const e of expenses) {
-      const line = `${e.label}: ${formatNumber(e.amount)}`;
-      drawSmartText(doc, loaded, line, expBoxX + 12, ey, { width: expBoxW - 24, fontSize: 12, maxLines: 2 });
-      ey += heightSmartText(doc, loaded, line, { width: expBoxW - 24, fontSize: 12, lineGap: 2, maxLines: 2 });
-    }
-  }
-
-  /* ---------- Note ---------- */
-  if (invoice.note && String(invoice.note).trim()) {
-    const noteTitle = "Note / หมายเหตุ";
-    const noteText = String(invoice.note);
-
-    const noteW = right - left;
-    const noteTitleH = heightSmartText(doc, loaded, noteTitle, { width: noteW, bold: true, fontSize: 14, lineGap: 2 });
-    const noteTextH = heightSmartText(doc, loaded, noteText, { width: noteW, fontSize: 12, lineGap: 2, maxLines: 6 });
-    const need = 10 + noteTitleH + 6 + noteTextH + 10;
-
-    if (tableY + need > bottom) {
-      doc.addPage();
-      registerFonts(doc);
-      tableY = doc.page.margins.top;
-    }
-
-    drawSmartText(doc, loaded, noteTitle, left, tableY, { width: noteW, bold: true, fontSize: 14 });
-    tableY += noteTitleH + 6;
-    drawSmartText(doc, loaded, noteText, left, tableY, { width: noteW, fontSize: 12, maxLines: 6 });
-    tableY += noteTextH + 12;
-  }
-
-  /* ---------- Signatures ---------- */
-  const sigNeed = 120;
-  if (tableY + sigNeed > bottom) {
-    doc.addPage();
-    registerFonts(doc);
-    tableY = doc.page.margins.top;
-  }
-
-  const sigY = Math.min(bottom - 90, tableY + 30);
-
-  const sig1 = "ผู้ส่งสินค้า";
-  const sig2 = "ผู้รับสินค้า";
-
-  drawSmartText(doc, loaded, sig1, left + 40, sigY, { width: 200, align: "center", fontSize: 12 });
-  drawSmartText(doc, loaded, sig2, right - 240, sigY, { width: 200, align: "center", fontSize: 12 });
-
-  doc.moveTo(left + 40, sigY + 35).lineTo(left + 240, sigY + 35).stroke("#000");
-  doc.moveTo(right - 240, sigY + 35).lineTo(right - 40, sigY + 35).stroke("#000");
 
   doc.end();
 }
@@ -931,7 +857,10 @@ router.post("/", async (req, res) => {
 
     const created = await prisma.invoice.create({
       data: {
-        // ของเดิม
+        // ✅ เพิ่ม: เลือกหัวเอกสาร
+        docType: body.docType || "INVOICE",
+
+        // legacy
         date: body.date ? new Date(body.date) : new Date(),
         rate: body.rate === null || body.rate === undefined ? null : safeNumber(body.rate, 0),
 
@@ -952,16 +881,16 @@ router.post("/", async (req, res) => {
         companyPhone: body.companyPhone || null,
 
         companyLogoKey: body.companyLogoKey || null,
-
         note: body.note || null,
 
-        // ใบจริง (optional)
+        // ใบจริง
         shipDate: body.shipDate ? new Date(body.shipDate) : null,
         route: body.route || null,
         temperature: body.temperature || null,
         transport: body.transport || null,
         brandRemark: body.brandRemark || null,
 
+        // snapshots
         totalBoxes: body.totalBoxes === undefined ? undefined : safeNumber(body.totalBoxes, 0),
         totalWeightKg: body.totalWeightKg === undefined ? undefined : safeNumber(body.totalWeightKg, 0),
         subtotalAmount: body.subtotalAmount === undefined ? undefined : safeNumber(body.subtotalAmount, 0),
@@ -973,7 +902,6 @@ router.post("/", async (req, res) => {
 
         items: {
           create: items.map((it) => ({
-            // เดิม
             brand: it.brand || null,
             variety: it.variety || null,
             grade: it.grade || null,
@@ -981,7 +909,6 @@ router.post("/", async (req, res) => {
             weightPerBox: it.weightPerBox === null || it.weightPerBox === undefined ? null : safeNumber(it.weightPerBox, 0),
             pricePerKg: it.pricePerKg === null || it.pricePerKg === undefined ? null : safeNumber(it.pricePerKg, 0),
 
-            // ใหม่
             purchaseDate: it.purchaseDate ? new Date(it.purchaseDate) : null,
             boxSize: it.boxSize || null,
             weightTotalKg: it.weightTotalKg === undefined ? undefined : safeNumber(it.weightTotalKg, 0),
@@ -1071,13 +998,14 @@ router.put("/:id", async (req, res) => {
     const items = Array.isArray(body.items) ? body.items : [];
     const expenses = Array.isArray(body.expenses) ? body.expenses : [];
 
-    // ลบรายการลูกก่อน (ง่ายและชัวร์)
     await prisma.invoiceItem.deleteMany({ where: { invoiceId: id } });
     await prisma.invoiceExpense.deleteMany({ where: { invoiceId: id } });
 
     const updated = await prisma.invoice.update({
       where: { id },
       data: {
+        docType: body.docType || "INVOICE",
+
         date: body.date ? new Date(body.date) : new Date(),
         rate: body.rate === null || body.rate === undefined ? null : safeNumber(body.rate, 0),
 
@@ -1153,9 +1081,7 @@ router.put("/:id", async (req, res) => {
 router.delete("/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-
     await prisma.invoice.delete({ where: { id } });
-
     res.json({ message: "ลบสำเร็จ" });
   } catch (err) {
     console.error("❌ DELETE /v1/invoices/:id error::", err);
