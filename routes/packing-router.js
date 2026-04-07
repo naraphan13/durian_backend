@@ -108,14 +108,14 @@ router.post("/:id/pdf", async (req, res) => {
     }
 
     const doc = new PDFDocument({
-      size: [396, 648], // คงขนาดเดิม
+      size: [396, 648],
       margin: 20,
       layout: "landscape",
       autoFirstPage: true,
     });
 
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `inline; filename="packing-${data.id}.pdf"`);
+    res.setHeader("Content-Disposition", `inline; filename=packing-${data.id}.pdf`);
     doc.pipe(res);
 
     // ===== FONT =====
@@ -149,18 +149,18 @@ router.post("/:id/pdf", async (req, res) => {
       totalExtraExpense += Number(e.amount) || 0;
     });
 
-    // ✅ จ่ายเพิ่ม = บวก
     const finalTotal = total - totalDeduction + totalExtraExpense;
 
     // ===== HEADER =====
     const logoPath = path.join(__dirname, "../picture/S__5275654png (1).png");
+
     const topY = 18;
     const logoSize = 60;
     const logoX = 20;
     const logoY = topY + 8;
     const companyX = logoX + logoSize + 12;
-    const billInfoX = 365; // ขยับให้พอดีฝั่งขวา
-    const billInfoWidth = 190;
+    const billInfoX = 360;
+    const billWidth = 200;
 
     const rawDate = data.date ? new Date(data.date) : new Date();
     const safeDate = isNaN(rawDate.getTime()) ? new Date() : rawDate;
@@ -178,47 +178,43 @@ router.post("/:id/pdf", async (req, res) => {
       doc.image(logoPath, logoX, logoY, { fit: [logoSize, logoSize] });
     }
 
-    // บริษัท
     doc.font("thai").fontSize(12).text("บริษัท สุริยา388 จำกัด", companyX, topY);
-    doc.font("thai").fontSize(12).text(
+    doc.text(
       "เลขที่ 203/2 ม.12 ต.บ้านนา อ.เมืองชุมพร จ.ชุมพร 86190",
       companyX,
       topY + 16
     );
-    doc.font("thai").fontSize(12).text(
+    doc.text(
       "โทร: 081-078-2324 , 082-801-1225 , 095-905-5588",
       companyX,
       topY + 32
     );
 
-    // ข้อมูลฝั่งขวาบน
-    doc.font("thai").fontSize(12).text(
+    // ===== บนขวา =====
+    doc.text(
       `รหัสบิล: ${data.id}    จ่ายให้: ${recipient}`,
       billInfoX,
       topY,
-      { width: billInfoWidth }
+      { width: billWidth }
     );
 
-    doc.font("thai").fontSize(12).text(
+    doc.text(
       "โดย: ___ เงินสด   ___ โอนผ่านบัญชีธนาคาร",
       billInfoX,
       topY + 16,
-      { width: billInfoWidth }
+      { width: billWidth }
     );
 
-    doc.font("thai").fontSize(12).text(
+    doc.text(
       "เพื่อชำระ: ค่าบริการแพ็คทุเรียน",
       billInfoX,
       topY + 32,
-      { width: billInfoWidth }
+      { width: billWidth }
     );
 
-    doc.font("thai").fontSize(12).text(
-      `วันที่: ${dateStr}`,
-      billInfoX,
-      topY + 48,
-      { width: billInfoWidth }
-    );
+    doc.text(`วันที่: ${dateStr}`, billInfoX, topY + 48, {
+      width: billWidth,
+    });
 
     // ===== TITLE =====
     doc.font("thai-bold").fontSize(17).text(
@@ -228,215 +224,143 @@ router.post("/:id/pdf", async (req, res) => {
       { align: "center", width: doc.page.width }
     );
 
-    // ===== CONTENT LAYOUT =====
+    // ===== LAYOUT =====
     const leftX = 20;
-    const rightX = 315;
-    const leftWidth = 250;
-    const rightWidth = 230;
+    const rightX = 310;
+    const leftWidth = 260;
+    const rightWidth = 240;
 
-    let leftY = 122;
-    let rightY = 122;
+    let leftY = 120;
+    let rightY = 120;
 
-    // กันเนื้อหาชนลายเซ็น
-    const maxContentBottom = 330;
+    const maxBottom = 340;
 
     const leftLine = (text, opts = {}) => {
-      const fontSize = opts.size || 15;
-      const lineGap = opts.lineGap ?? 1;
-      const indent = opts.indent || 0;
-      const width = leftWidth - indent;
-
       doc
         .font(opts.bold ? "thai-bold" : "thai")
-        .fontSize(fontSize)
-        .text(text, leftX + indent, leftY, {
-          width,
-          lineGap,
+        .fontSize(opts.size || 15)
+        .text(text, leftX, leftY, {
+          width: leftWidth,
+          lineGap: 1,
         });
 
-      const height = doc.heightOfString(text, {
-        width,
-        lineGap,
-      });
-
-      leftY += height + (opts.afterGap ?? 5);
+      const h = doc.heightOfString(text, { width: leftWidth });
+      leftY += h + (opts.afterGap ?? 5);
     };
 
     const rightLine = (text, opts = {}) => {
-      const fontSize = opts.size || 13;
-      const lineGap = opts.lineGap ?? 1;
-      const indent = opts.indent || 0;
-      const width = rightWidth - indent;
-
       doc
         .font(opts.bold ? "thai-bold" : "thai")
-        .fontSize(fontSize)
-        .text(text, rightX + indent, rightY, {
-          width,
-          lineGap,
+        .fontSize(opts.size || 13)
+        .text(text, rightX, rightY, {
+          width: rightWidth,
+          lineGap: 1,
         });
 
-      const height = doc.heightOfString(text, {
-        width,
-        lineGap,
-      });
-
-      rightY += height + (opts.afterGap ?? 4);
+      const h = doc.heightOfString(text, { width: rightWidth });
+      rightY += h + (opts.afterGap ?? 4);
     };
 
-    // ===== LEFT COLUMN =====
-    leftLine("ใบสรุปค่าแพ็คทุเรียน", {
-      size: 16,
-      bold: false,
-      afterGap: 3,
-    });
-
-    leftLine("รายละเอียดค่าแพ็ค:", {
-      size: 16,
-      bold: true,
-      afterGap: 5,
-    });
+    // ===== LEFT =====
+    leftLine("รายละเอียดค่าแพ็ค", { bold: true, size: 16 });
 
     leftLine(
-      `กล่องใหญ่: ${bigQty.toLocaleString()} กล่อง × ${bigPrice.toLocaleString()} บาท = ${totalBig.toLocaleString()} บาท`,
-      {
-        size: 15,
-        afterGap: 4,
-      }
+      `กล่องใหญ่: ${bigQty} × ${bigPrice} = ${totalBig.toLocaleString()} บาท`
     );
 
     leftLine(
-      `กล่องเล็ก: ${smallQty.toLocaleString()} กล่อง × ${smallPrice.toLocaleString()} บาท = ${totalSmall.toLocaleString()} บาท`,
-      {
-        size: 15,
-        afterGap: 7,
-      }
+      `กล่องเล็ก: ${smallQty} × ${smallPrice} = ${totalSmall.toLocaleString()} บาท`
     );
 
-    leftLine("สรุปยอด:", {
-      size: 16,
-      bold: true,
-      afterGap: 5,
-    });
+    leftLine("สรุปยอด", { bold: true, size: 16 });
 
-    leftLine(`รวมค่าบริการแพ็ค: ${total.toLocaleString()} บาท`, {
-      size: 15,
-      bold: true,
-      afterGap: 4,
-    });
+    leftLine(`รวม: ${total.toLocaleString()} บาท`, { bold: true });
 
-    leftLine(`ยอดจ่ายสุทธิ: ${finalTotal.toLocaleString()} บาท`, {
+    leftLine(`สุทธิ: ${finalTotal.toLocaleString()} บาท`, {
+      bold: true,
       size: 17,
-      bold: true,
-      afterGap: 5,
     });
 
-    // ===== RIGHT COLUMN =====
+    // ===== RIGHT =====
     if (deductions.length > 0) {
-      rightLine("รายละเอียดรายการหักเบิก:", {
-        size: 14,
-        bold: true,
-        afterGap: 5,
-      });
+      rightLine("รายการหักเบิก", { bold: true, size: 14 });
 
       deductions.forEach((d, i) => {
-        if (rightY < maxContentBottom) {
+        if (rightY < maxBottom) {
           rightLine(
-            `${i + 1}. ${d.label || "-"} : ${(Number(d.amount) || 0).toLocaleString()} บาท`,
-            {
-              size: 13,
-              indent: 6,
-              afterGap: 3,
-            }
+            `${i + 1}. ${d.label || "-"} : ${Number(
+              d.amount
+            ).toLocaleString()} บาท`
           );
         }
       });
 
-      if (rightY < maxContentBottom) {
-        rightY += 4;
-        rightLine(`รวมรายการหักเบิก: ${totalDeduction.toLocaleString()} บาท`, {
-          size: 14,
-          bold: true,
-          afterGap: 5,
-        });
-      }
+      rightLine(
+        `รวมรายการหักเบิก: ${totalDeduction.toLocaleString()} บาท`,
+        { bold: true }
+      );
     }
 
-    if (extraExpenses.length > 0 && rightY < maxContentBottom) {
-      rightY += 4;
+    if (extraExpenses.length > 0 && rightY < maxBottom) {
+      rightY += 8;
 
-      rightLine("รายละเอียดจ่ายเพิ่มอื่นๆ:", {
-        size: 14,
-        bold: true,
-        afterGap: 5,
-      });
+      rightLine("รายการจ่ายเพิ่ม", { bold: true, size: 14 });
 
       extraExpenses.forEach((e, i) => {
-        if (rightY < maxContentBottom) {
+        if (rightY < maxBottom) {
           rightLine(
-            `${i + 1}. ${e.label || "-"} : ${(Number(e.amount) || 0).toLocaleString()} บาท`,
-            {
-              size: 13,
-              indent: 6,
-              afterGap: 3,
-            }
+            `${i + 1}. ${e.label || "-"} : ${Number(
+              e.amount
+            ).toLocaleString()} บาท`
           );
         }
       });
 
-      if (rightY < maxContentBottom) {
-        rightY += 4;
-        rightLine(`รวมจ่ายเพิ่มอื่นๆ: ${totalExtraExpense.toLocaleString()} บาท`, {
-          size: 14,
-          bold: true,
-          afterGap: 5,
-        });
-      }
+      rightLine(
+        `รวมจ่ายเพิ่มอื่นๆ: ${totalExtraExpense.toLocaleString()} บาท`,
+        { bold: true }
+      );
     }
 
-    // ===== CENTER DIVIDER =====
-    doc
-      .moveTo(292, 116)
-      .lineTo(292, 350)
-      .strokeColor("#999999")
-      .lineWidth(0.5)
-      .stroke();
+    // ===== เส้นกลาง =====
+    doc.moveTo(290, 110).lineTo(290, 350).stroke();
 
-    // ===== SIGNATURE =====
-    // fix ตำแหน่งให้อยู่หน้าเดียวแน่นอน
-    const signatureBaseY = 360;
+    // ===== SIGNATURE (แก้แล้ว ไม่ตกบรรทัด) =====
+    const signY = 360;
 
-    doc.font("thai").fontSize(11).text(
-      "...............................................",
-      40,
-      signatureBaseY
-    );
-    doc.font("thai").fontSize(11).text(
-      "ผู้จ่ายเงิน",
-      40,
-      signatureBaseY + 12
-    );
-    doc.font("thai").fontSize(11).text(
-      "ลงวันที่: ........../........../..........",
-      40,
-      signatureBaseY + 26
-    );
+    // ซ้าย
+    doc.text("...............................................", 40, signY, {
+      width: 180,
+      lineBreak: false,
+    });
 
-    doc.font("thai").fontSize(11).text(
-      "...............................................",
-      340,
-      signatureBaseY
-    );
-    doc.font("thai").fontSize(11).text(
-      "ผู้รับเงิน",
-      340,
-      signatureBaseY + 12
-    );
-    doc.font("thai").fontSize(11).text(
-      "ลงวันที่: ........../........../..........",
-      340,
-      signatureBaseY + 26
-    );
+    doc.text("ผู้จ่ายเงิน", 85, signY + 14, {
+      width: 100,
+      align: "center",
+      lineBreak: false,
+    });
+
+    doc.text("ลงวันที่: ........../........../..........", 45, signY + 28, {
+      width: 180,
+      lineBreak: false,
+    });
+
+    // ขวา
+    doc.text("...............................................", 340, signY, {
+      width: 180,
+      lineBreak: false,
+    });
+
+    doc.text("ผู้รับเงิน", 385, signY + 14, {
+      width: 100,
+      align: "center",
+      lineBreak: false,
+    });
+
+    doc.text("ลงวันที่: ........../........../..........", 345, signY + 28, {
+      width: 180,
+      lineBreak: false,
+    });
 
     doc.end();
   } catch (err) {
