@@ -414,7 +414,7 @@ router.post("/:id/pdf", async (req, res) => {
 
     // ===== SIGNATURE =====
     // สำคัญ: ย้ายขึ้นมาให้อยู่ในหน้าชัวร์
-    const signY = 300;
+    const signY = 320;
 
     // เส้นซ้าย
     doc.font("thai").fontSize(11).text(
