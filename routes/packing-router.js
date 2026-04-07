@@ -115,19 +115,29 @@ router.post("/:id/pdf", async (req, res) => {
     });
 
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `inline; filename=packing-${data.id}.pdf`);
+    res.setHeader(
+      "Content-Disposition",
+      `inline; filename="packing-${data.id}.pdf"`
+    );
+
     doc.pipe(res);
 
     // ===== FONT =====
     const fontPath = path.join(__dirname, "../fonts/THSarabunNew.ttf");
     const fontBoldPath = path.join(__dirname, "../fonts/THSarabunNewBold.ttf");
 
-    if (fs.existsSync(fontPath)) doc.registerFont("thai", fontPath);
-    if (fs.existsSync(fontBoldPath)) doc.registerFont("thai-bold", fontBoldPath);
+    if (fs.existsSync(fontPath)) {
+      doc.registerFont("thai", fontPath);
+    }
+    if (fs.existsSync(fontBoldPath)) {
+      doc.registerFont("thai-bold", fontBoldPath);
+    }
 
     // ===== DATA =====
     const deductions = Array.isArray(data.deductions) ? data.deductions : [];
-    const extraExpenses = Array.isArray(data.extraExpenses) ? data.extraExpenses : [];
+    const extraExpenses = Array.isArray(data.extraExpenses)
+      ? data.extraExpenses
+      : [];
 
     const bigQty = Number(data.bigBoxQuantity) || 0;
     const bigPrice = Number(data.bigBoxPrice) || 0;
@@ -149,6 +159,7 @@ router.post("/:id/pdf", async (req, res) => {
       totalExtraExpense += Number(e.amount) || 0;
     });
 
+    // ✅ จ่ายเพิ่มอื่นๆ = บวก
     const finalTotal = total - totalDeduction + totalExtraExpense;
 
     // ===== HEADER =====
@@ -159,8 +170,8 @@ router.post("/:id/pdf", async (req, res) => {
     const logoX = 20;
     const logoY = topY + 8;
     const companyX = logoX + logoSize + 12;
-    const billInfoX = 360;
-    const billWidth = 200;
+    const billInfoX = 355;
+    const billInfoWidth = 190;
 
     const rawDate = data.date ? new Date(data.date) : new Date();
     const safeDate = isNaN(rawDate.getTime()) ? new Date() : rawDate;
@@ -178,189 +189,300 @@ router.post("/:id/pdf", async (req, res) => {
       doc.image(logoPath, logoX, logoY, { fit: [logoSize, logoSize] });
     }
 
+    // บริษัท
     doc.font("thai").fontSize(12).text("บริษัท สุริยา388 จำกัด", companyX, topY);
-    doc.text(
+    doc.font("thai").fontSize(12).text(
       "เลขที่ 203/2 ม.12 ต.บ้านนา อ.เมืองชุมพร จ.ชุมพร 86190",
       companyX,
       topY + 16
     );
-    doc.text(
+    doc.font("thai").fontSize(12).text(
       "โทร: 081-078-2324 , 082-801-1225 , 095-905-5588",
       companyX,
       topY + 32
     );
 
-    // ===== บนขวา =====
-    doc.text(
+    // ข้อมูลฝั่งขวาบน
+    doc.font("thai").fontSize(12).text(
       `รหัสบิล: ${data.id}    จ่ายให้: ${recipient}`,
       billInfoX,
       topY,
-      { width: billWidth }
+      { width: billInfoWidth }
     );
 
-    doc.text(
+    doc.font("thai").fontSize(12).text(
       "โดย: ___ เงินสด   ___ โอนผ่านบัญชีธนาคาร",
       billInfoX,
       topY + 16,
-      { width: billWidth }
+      { width: billInfoWidth }
     );
 
-    doc.text(
+    doc.font("thai").fontSize(12).text(
       "เพื่อชำระ: ค่าบริการแพ็คทุเรียน",
       billInfoX,
       topY + 32,
-      { width: billWidth }
+      { width: billInfoWidth }
     );
 
-    doc.text(`วันที่: ${dateStr}`, billInfoX, topY + 48, {
-      width: billWidth,
-    });
+    doc.font("thai").fontSize(12).text(
+      `วันที่: ${dateStr}`,
+      billInfoX,
+      topY + 48,
+      { width: billInfoWidth }
+    );
 
     // ===== TITLE =====
     doc.font("thai-bold").fontSize(17).text(
       "ใบสำคัญจ่าย PAYMENT VOUCHER",
       0,
       88,
-      { align: "center", width: doc.page.width }
+      {
+        align: "center",
+        width: doc.page.width,
+      }
     );
 
-    // ===== LAYOUT =====
+    // ===== CONTENT LAYOUT =====
     const leftX = 20;
     const rightX = 310;
-    const leftWidth = 260;
-    const rightWidth = 240;
+    const leftWidth = 255;
+    const rightWidth = 225;
 
-    let leftY = 120;
-    let rightY = 120;
+    let leftY = 122;
+    let rightY = 122;
 
-    const maxBottom = 340;
+    // ต้องต่ำกว่าลายเซ็น
+    const maxContentBottom = 275;
 
     const leftLine = (text, opts = {}) => {
+      const fontSize = opts.size || 15;
+      const lineGap = opts.lineGap ?? 1;
+      const width = opts.width || leftWidth;
+
       doc
         .font(opts.bold ? "thai-bold" : "thai")
-        .fontSize(opts.size || 15)
+        .fontSize(fontSize)
         .text(text, leftX, leftY, {
-          width: leftWidth,
-          lineGap: 1,
+          width,
+          lineGap,
         });
 
-      const h = doc.heightOfString(text, { width: leftWidth });
+      const h = doc.heightOfString(text, {
+        width,
+        lineGap,
+      });
+
       leftY += h + (opts.afterGap ?? 5);
     };
 
     const rightLine = (text, opts = {}) => {
+      const fontSize = opts.size || 13;
+      const lineGap = opts.lineGap ?? 1;
+      const width = opts.width || rightWidth;
+
       doc
         .font(opts.bold ? "thai-bold" : "thai")
-        .fontSize(opts.size || 13)
+        .fontSize(fontSize)
         .text(text, rightX, rightY, {
-          width: rightWidth,
-          lineGap: 1,
+          width,
+          lineGap,
         });
 
-      const h = doc.heightOfString(text, { width: rightWidth });
+      const h = doc.heightOfString(text, {
+        width,
+        lineGap,
+      });
+
       rightY += h + (opts.afterGap ?? 4);
     };
 
-    // ===== LEFT =====
-    leftLine("รายละเอียดค่าแพ็ค", { bold: true, size: 16 });
-
-    leftLine(
-      `กล่องใหญ่: ${bigQty} × ${bigPrice} = ${totalBig.toLocaleString()} บาท`
-    );
-
-    leftLine(
-      `กล่องเล็ก: ${smallQty} × ${smallPrice} = ${totalSmall.toLocaleString()} บาท`
-    );
-
-    leftLine("สรุปยอด", { bold: true, size: 16 });
-
-    leftLine(`รวม: ${total.toLocaleString()} บาท`, { bold: true });
-
-    leftLine(`สุทธิ: ${finalTotal.toLocaleString()} บาท`, {
-      bold: true,
-      size: 17,
+    // ===== LEFT COLUMN =====
+    leftLine("ใบสรุปค่าแพ็คทุเรียน", {
+      size: 16,
+      bold: false,
+      afterGap: 3,
     });
 
-    // ===== RIGHT =====
-    if (deductions.length > 0) {
-      rightLine("รายการหักเบิก", { bold: true, size: 14 });
+    leftLine("รายละเอียดค่าแพ็ค:", {
+      size: 16,
+      bold: true,
+      afterGap: 5,
+    });
+
+    leftLine(
+      `กล่องใหญ่: ${bigQty.toLocaleString()} กล่อง × ${bigPrice.toLocaleString()} บาท = ${totalBig.toLocaleString()} บาท`,
+      {
+        size: 15,
+        afterGap: 4,
+      }
+    );
+
+    leftLine(
+      `กล่องเล็ก: ${smallQty.toLocaleString()} กล่อง × ${smallPrice.toLocaleString()} บาท = ${totalSmall.toLocaleString()} บาท`,
+      {
+        size: 15,
+        afterGap: 7,
+      }
+    );
+
+    leftLine("สรุปยอด:", {
+      size: 16,
+      bold: true,
+      afterGap: 5,
+    });
+
+    leftLine(`รวมค่าบริการแพ็ค: ${total.toLocaleString()} บาท`, {
+      size: 15,
+      bold: true,
+      afterGap: 4,
+    });
+
+    leftLine(`ยอดจ่ายสุทธิ: ${finalTotal.toLocaleString()} บาท`, {
+      size: 17,
+      bold: true,
+      afterGap: 5,
+    });
+
+    // ===== RIGHT COLUMN =====
+    if (deductions.length > 0 && rightY < maxContentBottom) {
+      rightLine("รายละเอียดรายการหักเบิก:", {
+        size: 14,
+        bold: true,
+        afterGap: 5,
+      });
 
       deductions.forEach((d, i) => {
-        if (rightY < maxBottom) {
+        if (rightY < maxContentBottom) {
           rightLine(
-            `${i + 1}. ${d.label || "-"} : ${Number(
-              d.amount
-            ).toLocaleString()} บาท`
+            `${i + 1}. ${d.label || "-"} : ${(Number(d.amount) || 0).toLocaleString()} บาท`,
+            {
+              size: 13,
+              afterGap: 3,
+            }
           );
         }
       });
 
-      rightLine(
-        `รวมรายการหักเบิก: ${totalDeduction.toLocaleString()} บาท`,
-        { bold: true }
-      );
+      if (rightY < maxContentBottom) {
+        rightY += 4;
+        rightLine(`รวมรายการหักเบิก: ${totalDeduction.toLocaleString()} บาท`, {
+          size: 14,
+          bold: true,
+          afterGap: 5,
+        });
+      }
     }
 
-    if (extraExpenses.length > 0 && rightY < maxBottom) {
-      rightY += 8;
+    if (extraExpenses.length > 0 && rightY < maxContentBottom) {
+      rightY += 4;
 
-      rightLine("รายการจ่ายเพิ่ม", { bold: true, size: 14 });
+      rightLine("รายละเอียดจ่ายเพิ่มอื่นๆ:", {
+        size: 14,
+        bold: true,
+        afterGap: 5,
+      });
 
       extraExpenses.forEach((e, i) => {
-        if (rightY < maxBottom) {
+        if (rightY < maxContentBottom) {
           rightLine(
-            `${i + 1}. ${e.label || "-"} : ${Number(
-              e.amount
-            ).toLocaleString()} บาท`
+            `${i + 1}. ${e.label || "-"} : ${(Number(e.amount) || 0).toLocaleString()} บาท`,
+            {
+              size: 13,
+              afterGap: 3,
+            }
           );
         }
       });
 
-      rightLine(
-        `รวมจ่ายเพิ่มอื่นๆ: ${totalExtraExpense.toLocaleString()} บาท`,
-        { bold: true }
-      );
+      if (rightY < maxContentBottom) {
+        rightY += 4;
+        rightLine(`รวมจ่ายเพิ่มอื่นๆ: ${totalExtraExpense.toLocaleString()} บาท`, {
+          size: 14,
+          bold: true,
+          afterGap: 5,
+        });
+      }
     }
 
-    // ===== เส้นกลาง =====
-    doc.moveTo(290, 110).lineTo(290, 350).stroke();
+    // ===== CENTER DIVIDER =====
+    doc
+      .moveTo(290, 116)
+      .lineTo(290, 285)
+      .strokeColor("#999999")
+      .lineWidth(0.5)
+      .stroke();
 
-    // ===== SIGNATURE (แก้แล้ว ไม่ตกบรรทัด) =====
-    const signY = 360;
+    // ===== SIGNATURE =====
+    // สำคัญ: ย้ายขึ้นมาให้อยู่ในหน้าชัวร์
+    const signY = 300;
 
-    // ซ้าย
-    doc.text("...............................................", 40, signY, {
-      width: 180,
-      lineBreak: false,
-    });
+    // เส้นซ้าย
+    doc.font("thai").fontSize(11).text(
+      "...............................................",
+      40,
+      signY,
+      {
+        width: 180,
+        lineBreak: false,
+      }
+    );
 
-    doc.text("ผู้จ่ายเงิน", 85, signY + 14, {
-      width: 100,
-      align: "center",
-      lineBreak: false,
-    });
+    // ผู้จ่ายเงิน
+    doc.font("thai").fontSize(11).text(
+      "ผู้จ่ายเงิน",
+      85,
+      signY + 14,
+      {
+        width: 100,
+        align: "center",
+        lineBreak: false,
+      }
+    );
 
-    doc.text("ลงวันที่: ........../........../..........", 45, signY + 28, {
-      width: 180,
-      lineBreak: false,
-    });
+    // วันที่ซ้าย
+    doc.font("thai").fontSize(11).text(
+      "ลงวันที่: ........../........../..........",
+      45,
+      signY + 28,
+      {
+        width: 180,
+        lineBreak: false,
+      }
+    );
 
-    // ขวา
-    doc.text("...............................................", 340, signY, {
-      width: 180,
-      lineBreak: false,
-    });
+    // เส้นขวา
+    doc.font("thai").fontSize(11).text(
+      "...............................................",
+      340,
+      signY,
+      {
+        width: 180,
+        lineBreak: false,
+      }
+    );
 
-    doc.text("ผู้รับเงิน", 385, signY + 14, {
-      width: 100,
-      align: "center",
-      lineBreak: false,
-    });
+    // ผู้รับเงิน
+    doc.font("thai").fontSize(11).text(
+      "ผู้รับเงิน",
+      385,
+      signY + 14,
+      {
+        width: 100,
+        align: "center",
+        lineBreak: false,
+      }
+    );
 
-    doc.text("ลงวันที่: ........../........../..........", 345, signY + 28, {
-      width: 180,
-      lineBreak: false,
-    });
+    // วันที่ขวา
+    doc.font("thai").fontSize(11).text(
+      "ลงวันที่: ........../........../..........",
+      345,
+      signY + 28,
+      {
+        width: 180,
+        lineBreak: false,
+      }
+    );
 
     doc.end();
   } catch (err) {
@@ -371,5 +493,4 @@ router.post("/:id/pdf", async (req, res) => {
     });
   }
 });
-
 module.exports = router;
