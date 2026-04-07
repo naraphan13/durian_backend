@@ -23,25 +23,33 @@ router.get('/', async (req, res) => {
       orderBy: { date: 'desc' },
     });
 
-    const result = packings.map(p => {
-      const totalBig = p.bigBoxQuantity * p.bigBoxPrice;
-      const totalSmall = p.smallBoxQuantity * p.smallBoxPrice;
+    const result = packings.map((p) => {
+      const totalBig = (Number(p.bigBoxQuantity) || 0) * (Number(p.bigBoxPrice) || 0);
+      const totalSmall = (Number(p.smallBoxQuantity) || 0) * (Number(p.smallBoxPrice) || 0);
       const totalBeforeDeduction = totalBig + totalSmall;
 
-      const totalDeduction = Array.isArray(p.deductions)
-        ? p.deductions.reduce((sum, d) => sum + (Number(d.amount) || 0), 0)
-        : 0;
+      const deductions = Array.isArray(p.deductions) ? p.deductions : [];
+      const extraExpenses = Array.isArray(p.extraExpenses) ? p.extraExpenses : [];
 
-      const totalExtraExpense = Array.isArray(p.extraExpenses)
-        ? p.extraExpenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0)
-        : 0;
+      const totalDeduction = deductions.reduce(
+        (sum, d) => sum + (Number(d.amount) || 0),
+        0
+      );
+
+      const totalExtraExpense = extraExpenses.reduce(
+        (sum, e) => sum + (Number(e.amount) || 0),
+        0
+      );
+
+      // ✅ extraExpenses คือจ่ายเพิ่มให้เขา
+      const finalTotal = totalBeforeDeduction - totalDeduction + totalExtraExpense;
 
       return {
         ...p,
         totalBeforeDeduction,
         totalDeduction,
         totalExtraExpense,
-        finalTotal: totalBeforeDeduction - totalDeduction - totalExtraExpense,
+        finalTotal,
       };
     });
 
@@ -98,7 +106,7 @@ router.post("/:id/pdf", async (req, res) => {
     if (!data) return res.status(404).json({ error: "ไม่พบข้อมูล" });
 
     const doc = new PDFDocument({
-      size: [396, 648], // ✅ คงขนาดเดิม
+      size: [396, 648],
       margin: 20,
       layout: "landscape",
     });
@@ -107,13 +115,11 @@ router.post("/:id/pdf", async (req, res) => {
     res.setHeader("Content-Disposition", `inline; filename="packing-${data.id}.pdf"`);
     doc.pipe(res);
 
-    // ===== FONT =====
     const fontPath = path.join(__dirname, "../fonts/THSarabunNew.ttf");
     const fontBoldPath = path.join(__dirname, "../fonts/THSarabunNewBold.ttf");
     if (fs.existsSync(fontPath)) doc.registerFont("thai", fontPath);
     if (fs.existsSync(fontBoldPath)) doc.registerFont("thai-bold", fontBoldPath);
 
-    // ===== HEADER =====
     const logoPath = path.join(__dirname, "../picture/S__5275654png (1).png");
     const logoSize = 60;
     const topY = 18;
@@ -149,13 +155,11 @@ router.post("/:id/pdf", async (req, res) => {
     );
 
     const recipient = data.recipient || "__________";
-
     doc.text(`รหัสบิล: ${data.id}    จ่ายให้: ${recipient}`, billInfoX, topY);
     doc.text(`โดย: ___ เงินสด   ___ โอนผ่านบัญชีธนาคาร`, billInfoX, topY + 16);
     doc.text(`เพื่อชำระ: ค่าบริการแพ็คทุเรียน`, billInfoX, topY + 32);
     doc.text(`วันที่: ${dateStr}`, billInfoX, topY + 48);
 
-    // ===== TITLE =====
     doc.font("thai-bold").fontSize(17).text(
       "ใบสำคัญจ่าย PAYMENT VOUCHER",
       0,
@@ -163,7 +167,6 @@ router.post("/:id/pdf", async (req, res) => {
       { align: "center", width: doc.page.width }
     );
 
-    // ===== DATA =====
     const deductions = Array.isArray(data.deductions) ? data.deductions : [];
     const extraExpenses = Array.isArray(data.extraExpenses) ? data.extraExpenses : [];
 
@@ -184,9 +187,9 @@ router.post("/:id/pdf", async (req, res) => {
       totalExtraExpense += Number(e.amount) || 0;
     });
 
-    const finalTotal = total - totalDeduction - totalExtraExpense;
+    // ✅ extraExpenses = จ่ายเพิ่มให้เขา
+    const finalTotal = total - totalDeduction + totalExtraExpense;
 
-    // ===== LAYOUT 2 COLUMN =====
     const leftX = 20;
     const rightX = 305;
     const leftWidth = 255;
@@ -235,7 +238,6 @@ router.post("/:id/pdf", async (req, res) => {
       rightY += height + (opts.afterGap ?? 5);
     };
 
-    // ===== LEFT COLUMN =====
     leftLine("ใบสรุปค่าแพ็คทุเรียน", { size: 16, afterGap: 4 });
     leftLine("รายละเอียดค่าแพ็ค:", { bold: true, size: 16, afterGap: 6 });
 
@@ -254,7 +256,7 @@ router.post("/:id/pdf", async (req, res) => {
     );
 
     leftLine("สรุปยอด:", { bold: true, size: 16, afterGap: 6 });
-    leftLine(`รวมทั้งหมด: ${total.toLocaleString()} บาท`, { bold: true, afterGap: 4 });
+    leftLine(`รวมค่าบริการแพ็ค: ${total.toLocaleString()} บาท`, { bold: true, afterGap: 4 });
 
     if (totalDeduction > 0) {
       leftLine(`หักเบิก: ${totalDeduction.toLocaleString()} บาท`, {
@@ -264,19 +266,18 @@ router.post("/:id/pdf", async (req, res) => {
     }
 
     if (totalExtraExpense > 0) {
-      leftLine(`ค่าใช้จ่ายอื่น: ${totalExtraExpense.toLocaleString()} บาท`, {
+      leftLine(`จ่ายเพิ่มอื่นๆ: ${totalExtraExpense.toLocaleString()} บาท`, {
         bold: true,
         afterGap: 4,
       });
     }
 
-    leftLine(`คงเหลือสุทธิ: ${finalTotal.toLocaleString()} บาท`, {
+    leftLine(`ยอดจ่ายสุทธิ: ${finalTotal.toLocaleString()} บาท`, {
       bold: true,
       size: 17,
       afterGap: 6,
     });
 
-    // ===== RIGHT COLUMN =====
     if (deductions.length > 0) {
       rightLine("รายละเอียดรายการหัก:", {
         bold: true,
@@ -295,7 +296,7 @@ router.post("/:id/pdf", async (req, res) => {
     }
 
     if (extraExpenses.length > 0) {
-      rightLine("รายละเอียดค่าใช้จ่ายอื่นๆ:", {
+      rightLine("รายละเอียดจ่ายเพิ่มอื่นๆ:", {
         bold: true,
         size: 15,
         afterGap: 6,
@@ -309,7 +310,6 @@ router.post("/:id/pdf", async (req, res) => {
       });
     }
 
-    // ===== CENTER DIVIDER =====
     doc
       .moveTo(292, 116)
       .lineTo(292, doc.page.height - 78)
@@ -317,7 +317,6 @@ router.post("/:id/pdf", async (req, res) => {
       .lineWidth(0.5)
       .stroke();
 
-    // ===== SIGNATURE =====
     const signatureBaseY = doc.page.height - 62;
 
     doc.font("thai").fontSize(11).text(
