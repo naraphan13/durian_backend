@@ -81,6 +81,7 @@ model Packing {
   smallBoxQuantity Int
   smallBoxPrice    Float
   deductions       Json // Array ของรายการหักเบิก
+  extraExpenses Json? // ✅ เพิ่มใหม่: ค่าใช้จ่ายอื่นๆ
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 }
