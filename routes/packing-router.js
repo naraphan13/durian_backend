@@ -98,7 +98,7 @@ router.post("/:id/pdf", async (req, res) => {
     if (!data) return res.status(404).json({ error: "ไม่พบข้อมูล" });
 
     const doc = new PDFDocument({
-      size: [396, 648], // ✅ คงขนาดเดิม
+      size: [396, 648], // ❗คงขนาดเดิม
       margin: 20,
       layout: "landscape",
     });
@@ -113,7 +113,7 @@ router.post("/:id/pdf", async (req, res) => {
     if (fs.existsSync(fontPath)) doc.registerFont("thai", fontPath);
     if (fs.existsSync(fontBoldPath)) doc.registerFont("thai-bold", fontBoldPath);
 
-    // ===== LOGO / HEADER =====
+    // ===== HEADER =====
     const logoPath = path.join(__dirname, "../picture/S__5275654png (1).png");
     const logoSize = 60;
     const topY = 18;
@@ -136,45 +136,30 @@ router.post("/:id/pdf", async (req, res) => {
       doc.image(logoPath, logoX, logoY, { fit: [logoSize, logoSize] });
     }
 
-    doc.font("thai").fontSize(11).text("บริษัท สุริยา388 จำกัด", companyX, topY);
-    doc.font("thai").fontSize(11).text(
+    doc.font("thai").fontSize(12).text("บริษัท สุริยา388 จำกัด", companyX, topY);
+    doc.text(
       "เลขที่ 203/2 ม.12 ต.บ้านนา อ.เมืองชุมพร จ.ชุมพร 86190",
       companyX,
-      topY + 14
+      topY + 16
     );
-    doc.font("thai").fontSize(11).text(
+    doc.text(
       "โทร: 081-078-2324 , 082-801-1225 , 095-905-5588",
       companyX,
-      topY + 28
+      topY + 32
     );
 
     const recipient = data.recipient || "__________";
-    doc.font("thai").fontSize(11).text(
-      `รหัสบิล: ${data.id}    จ่ายให้: ${recipient}`,
-      billInfoX,
-      topY
-    );
-    doc.font("thai").fontSize(11).text(
-      `โดย: ___ เงินสด   ___ โอนผ่านบัญชีธนาคาร`,
-      billInfoX,
-      topY + 14
-    );
-    doc.font("thai").fontSize(11).text(
-      `เพื่อชำระ: ค่าบริการแพ็คทุเรียน`,
-      billInfoX,
-      topY + 28
-    );
-    doc.font("thai").fontSize(11).text(
-      `วันที่: ${dateStr}`,
-      billInfoX,
-      topY + 42
-    );
+
+    doc.text(`รหัสบิล: ${data.id}    จ่ายให้: ${recipient}`, billInfoX, topY);
+    doc.text(`โดย: ___ เงินสด   ___ โอนผ่านบัญชี`, billInfoX, topY + 16);
+    doc.text(`เพื่อ: ค่าบริการแพ็คทุเรียน`, billInfoX, topY + 32);
+    doc.text(`วันที่: ${dateStr}`, billInfoX, topY + 48);
 
     // ===== TITLE =====
-    doc.font("thai-bold").fontSize(15).text(
+    doc.font("thai-bold").fontSize(17).text(
       "ใบสำคัญจ่าย PAYMENT VOUCHER",
       0,
-      82,
+      88,
       { align: "center", width: doc.page.width }
     );
 
@@ -186,6 +171,7 @@ router.post("/:id/pdf", async (req, res) => {
       (Number(data.bigBoxQuantity) || 0) * (Number(data.bigBoxPrice) || 0);
     const totalSmall =
       (Number(data.smallBoxQuantity) || 0) * (Number(data.smallBoxPrice) || 0);
+
     const total = totalBig + totalSmall;
 
     let totalDeduction = 0;
@@ -201,133 +187,111 @@ router.post("/:id/pdf", async (req, res) => {
 
     const finalTotal = total - totalDeduction - totalExtraExpense;
 
-    // ===== TWO COLUMNS =====
+    // ===== LAYOUT 2 COLUMN =====
     const leftX = 20;
-    const rightX = 310;
+    const rightX = 300;
     const leftWidth = 270;
-    const rightWidth = 250;
+    const rightWidth = 280;
 
-    let leftY = 112;
-    let rightY = 112;
+    let leftY = 120;
+    let rightY = 120;
 
     const leftLine = (text, opts = {}) => {
       doc
         .font(opts.bold ? "thai-bold" : "thai")
-        .fontSize(opts.size || 13)
+        .fontSize(opts.size || 15)
         .text(text, leftX + (opts.indent || 0), leftY, {
-          width: leftWidth - (opts.indent || 0),
+          width: leftWidth,
         });
 
-      leftY += opts.gap || 14;
+      leftY += opts.gap || 12;
     };
 
     const rightLine = (text, opts = {}) => {
       doc
         .font(opts.bold ? "thai-bold" : "thai")
-        .fontSize(opts.size || 12)
+        .fontSize(opts.size || 14)
         .text(text, rightX + (opts.indent || 0), rightY, {
-          width: rightWidth - (opts.indent || 0),
+          width: rightWidth,
         });
 
-      rightY += opts.gap || 13;
+      rightY += opts.gap || 11;
     };
 
-    // ===== LEFT COLUMN =====
-    leftLine("ใบสรุปค่าแพ็คทุเรียน", { size: 14 });
-    leftLine("รายละเอียดค่าแพ็ค:", { size: 14, bold: true });
+    // ===== LEFT =====
+    leftLine("ใบสรุปค่าแพ็คทุเรียน", { size: 16 });
+    leftLine("รายละเอียดค่าแพ็ค:", { bold: true, size: 16 });
+
     leftLine(
-      `กล่องใหญ่: ${Number(data.bigBoxQuantity || 0).toLocaleString()} กล่อง × ${Number(
-        data.bigBoxPrice || 0
-      ).toLocaleString()} บาท = ${totalBig.toLocaleString()} บาท`
+      `กล่องใหญ่: ${data.bigBoxQuantity} × ${data.bigBoxPrice} = ${totalBig.toLocaleString()} บาท`
     );
+
     leftLine(
-      `กล่องเล็ก: ${Number(data.smallBoxQuantity || 0).toLocaleString()} กล่อง × ${Number(
-        data.smallBoxPrice || 0
-      ).toLocaleString()} บาท = ${totalSmall.toLocaleString()} บาท`
+      `กล่องเล็ก: ${data.smallBoxQuantity} × ${data.smallBoxPrice} = ${totalSmall.toLocaleString()} บาท`
     );
 
     leftY += 6;
 
-    leftLine("สรุปยอด:", { size: 14, bold: true });
-    leftLine(`รวมทั้งหมด: ${total.toLocaleString()} บาท`, { bold: true });
+    leftLine("สรุปยอด:", { bold: true, size: 16 });
+    leftLine(`รวม: ${total.toLocaleString()} บาท`, { bold: true });
 
     if (totalDeduction > 0) {
-      leftLine(`หักเบิก: ${totalDeduction.toLocaleString()} บาท`, { bold: true });
+      leftLine(`หัก: ${totalDeduction.toLocaleString()} บาท`, { bold: true });
     }
 
     if (totalExtraExpense > 0) {
-      leftLine(`ค่าใช้จ่ายอื่น: ${totalExtraExpense.toLocaleString()} บาท`, { bold: true });
+      leftLine(`ค่าอื่น: ${totalExtraExpense.toLocaleString()} บาท`, { bold: true });
     }
 
-    leftLine(`คงเหลือหลังหัก: ${finalTotal.toLocaleString()} บาท`, {
-      size: 14,
+    leftLine(`สุทธิ: ${finalTotal.toLocaleString()} บาท`, {
       bold: true,
+      size: 17,
     });
 
-    // ===== RIGHT COLUMN =====
+    // ===== RIGHT =====
     if (deductions.length > 0) {
-      rightLine("รายละเอียดรายการหัก:", { size: 13, bold: true });
+      rightLine("รายการหัก:", { bold: true });
 
-      deductions.forEach((d, idx) => {
-        const amount = Number(d.amount) || 0;
-        rightLine(`${idx + 1}. ${d.label || "-"}: ${amount.toLocaleString()} บาท`, {
-          indent: 8,
-        });
+      deductions.forEach((d, i) => {
+        rightLine(
+          `${i + 1}. ${d.label || "-"} ${Number(d.amount).toLocaleString()} บาท`
+        );
       });
 
       rightY += 4;
     }
 
     if (extraExpenses.length > 0) {
-      rightLine("รายละเอียดค่าใช้จ่ายอื่นๆ:", { size: 13, bold: true });
+      rightLine("ค่าใช้จ่ายอื่น:", { bold: true });
 
-      extraExpenses.forEach((e, idx) => {
-        const amount = Number(e.amount) || 0;
-        rightLine(`${idx + 1}. ${e.label || "-"}: ${amount.toLocaleString()} บาท`, {
-          indent: 8,
-        });
+      extraExpenses.forEach((e, i) => {
+        rightLine(
+          `${i + 1}. ${e.label || "-"} ${Number(e.amount).toLocaleString()} บาท`
+        );
       });
     }
 
-    // ===== OPTIONAL CENTER DIVIDER =====
+    // ===== เส้นกลาง =====
     doc
-      .moveTo(295, 108)
-      .lineTo(295, doc.page.height - 72)
-      .strokeColor("#999999")
+      .moveTo(290, 110)
+      .lineTo(290, doc.page.height - 70)
+      .strokeColor("#999")
       .lineWidth(0.5)
       .stroke();
 
-    // ===== SIGNATURE =====
-    const signatureBaseY = doc.page.height - 58;
+    // ===== SIGN =====
+    const ySign = doc.page.height - 60;
 
-    doc.font("thai").fontSize(10).text(
-      "...............................................",
-      40,
-      signatureBaseY
-    );
-    doc.font("thai").fontSize(10).text("ผู้จ่ายเงิน", 40, signatureBaseY + 10);
-    doc.font("thai").fontSize(10).text(
-      "ลงวันที่: ........../........../..........",
-      40,
-      signatureBaseY + 22
-    );
+    doc.font("thai").fontSize(11).text("............................", 40, ySign);
+    doc.text("ผู้จ่ายเงิน", 40, ySign + 12);
 
-    doc.font("thai").fontSize(10).text(
-      "...............................................",
-      340,
-      signatureBaseY
-    );
-    doc.font("thai").fontSize(10).text("ผู้รับเงิน", 340, signatureBaseY + 10);
-    doc.font("thai").fontSize(10).text(
-      "ลงวันที่: ........../........../..........",
-      340,
-      signatureBaseY + 22
-    );
+    doc.text("............................", 340, ySign);
+    doc.text("ผู้รับเงิน", 340, ySign + 12);
 
     doc.end();
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "เกิดข้อผิดพลาดในการสร้าง PDF", details: err });
+    res.status(500).json({ error: "สร้าง PDF ไม่สำเร็จ", details: err });
   }
 });
 
