@@ -90,6 +90,8 @@ model ChemicalDip {
   id         Int      @id @default(autoincrement())
   date       String
   recipient  String? // ✅ เพิ่มตรงนี้
+  deductions    Json? // ✅ รายการหักเบิก
+  extraExpenses Json? // ✅ จ่ายเพิ่มอื่นๆ
   weight     Float
   pricePerKg Float
   createdAt  DateTime @default(now())
