@@ -107,6 +107,7 @@ router.post("/:id/pdf", async (req, res) => {
       return res.status(404).json({ error: "ไม่พบข้อมูล" });
     }
 
+    // ===== CREATE DOC =====
     const doc = new PDFDocument({
       size: [396, 648],
       margin: 20,
@@ -114,45 +115,94 @@ router.post("/:id/pdf", async (req, res) => {
     });
 
     res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      `inline; filename=packing-${data.id}.pdf`
+    );
+
     doc.pipe(res);
 
     // ===== FONT =====
     const fontPath = path.join(__dirname, "../fonts/THSarabunNew.ttf");
-    const fontBoldPath = path.join(__dirname, "../fonts/THSarabunNewBold.ttf");
+    const fontBoldPath = path.join(
+      __dirname,
+      "../fonts/THSarabunNewBold.ttf"
+    );
 
     if (fs.existsSync(fontPath)) doc.registerFont("thai", fontPath);
-    if (fs.existsSync(fontBoldPath)) doc.registerFont("thai-bold", fontBoldPath);
+    if (fs.existsSync(fontBoldPath))
+      doc.registerFont("thai-bold", fontBoldPath);
 
     // ===== HEADER =====
+    const logoPath = path.join(
+      __dirname,
+      "../picture/S__5275654png (1).png"
+    );
+
+    const topY = 18;
+    const logoSize = 60;
+    const logoX = 20;
+    const logoY = topY + 8;
+    const companyX = logoX + logoSize + 12;
+    const rightInfoX = companyX + 240;
+
+    // LOGO
+    if (fs.existsSync(logoPath)) {
+      doc.image(logoPath, logoX, logoY, { fit: [logoSize, logoSize] });
+    }
+
+    // COMPANY
+    doc.font("thai").fontSize(12).text("บริษัท สุริยา388 จำกัด", companyX, topY);
+    doc.text(
+      "เลขที่ 203/2 ม.12 ต.บ้านนา อ.เมืองชุมพร จ.ชุมพร 86190",
+      companyX,
+      topY + 16
+    );
+    doc.text(
+      "โทร: 081-078-2324 , 082-801-1225 , 095-905-5588",
+      companyX,
+      topY + 32
+    );
+
+    // DATE
     const rawDate = data.date ? new Date(data.date) : new Date();
+    const safeDate = isNaN(rawDate.getTime()) ? new Date() : rawDate;
+
     const dateStr = new Intl.DateTimeFormat("th-TH", {
       year: "numeric",
       month: "long",
       day: "numeric",
       timeZone: "Asia/Bangkok",
-    }).format(rawDate);
+    }).format(safeDate);
 
+    const recipient = data.recipient || "__________";
+
+    doc.text(`รหัสบิล: ${data.id}    จ่ายให้: ${recipient}`, rightInfoX, topY);
+    doc.text(`วันที่: ${dateStr}`, rightInfoX, topY + 16);
+
+    // ===== TITLE =====
     doc.font("thai-bold").fontSize(17).text(
       "ใบสำคัญจ่าย PAYMENT VOUCHER",
       0,
-      40,
+      88,
       { align: "center" }
     );
 
-    doc.font("thai").fontSize(13).text(`วันที่: ${dateStr}`, 20, 80);
-
     // ===== DATA =====
-    const deductions = Array.isArray(data.deductions) ? data.deductions : [];
-    const extraExpenses = Array.isArray(data.extraExpenses) ? data.extraExpenses : [];
+    const deductions = Array.isArray(data.deductions)
+      ? data.deductions
+      : [];
+    const extraExpenses = Array.isArray(data.extraExpenses)
+      ? data.extraExpenses
+      : [];
 
-    const totalBig =
-      (Number(data.bigBoxQuantity) || 0) *
-      (Number(data.bigBoxPrice) || 0);
+    const bigQty = Number(data.bigBoxQuantity) || 0;
+    const bigPrice = Number(data.bigBoxPrice) || 0;
+    const smallQty = Number(data.smallBoxQuantity) || 0;
+    const smallPrice = Number(data.smallBoxPrice) || 0;
 
-    const totalSmall =
-      (Number(data.smallBoxQuantity) || 0) *
-      (Number(data.smallBoxPrice) || 0);
-
+    const totalBig = bigQty * bigPrice;
+    const totalSmall = smallQty * smallPrice;
     const total = totalBig + totalSmall;
 
     let totalDeduction = 0;
@@ -171,93 +221,108 @@ router.post("/:id/pdf", async (req, res) => {
     // ===== LAYOUT =====
     const leftX = 20;
     const rightX = 300;
+    const leftWidth = 260;
+    const rightWidth = 260;
 
-    let leftY = 110;
-    let rightY = 110;
+    let leftY = 120;
+    let rightY = 120;
 
-    const leftLine = (text, size = 15, bold = false) => {
+    const leftLine = (text, opts = {}) => {
       doc
-        .font(bold ? "thai-bold" : "thai")
-        .fontSize(size)
-        .text(text, leftX, leftY);
-      leftY += 18;
+        .font(opts.bold ? "thai-bold" : "thai")
+        .fontSize(opts.size || 15)
+        .text(text, leftX, leftY, {
+          width: leftWidth,
+          lineGap: 2,
+        });
+
+      const h = doc.heightOfString(text, {
+        width: leftWidth,
+      });
+
+      leftY += h + (opts.afterGap ?? 6);
     };
 
-    const rightLine = (text, size = 14, bold = false) => {
+    const rightLine = (text, opts = {}) => {
       doc
-        .font(bold ? "thai-bold" : "thai")
-        .fontSize(size)
-        .text(text, rightX, rightY);
-      rightY += 16;
+        .font(opts.bold ? "thai-bold" : "thai")
+        .fontSize(opts.size || 14)
+        .text(text, rightX, rightY, {
+          width: rightWidth,
+          lineGap: 1,
+        });
+
+      const h = doc.heightOfString(text, {
+        width: rightWidth,
+      });
+
+      rightY += h + (opts.afterGap ?? 5);
     };
 
-    // ===== LEFT =====
-    leftLine("รายละเอียดค่าแพ็ค", 16, true);
+    // ===== LEFT (เฉพาะสรุป) =====
+    leftLine("รายละเอียดค่าแพ็ค", { bold: true, size: 16 });
 
     leftLine(
-      `กล่องใหญ่: ${data.bigBoxQuantity} × ${data.bigBoxPrice} = ${totalBig.toLocaleString()} บาท`
+      `กล่องใหญ่: ${bigQty} × ${bigPrice} = ${totalBig.toLocaleString()} บาท`
     );
 
     leftLine(
-      `กล่องเล็ก: ${data.smallBoxQuantity} × ${data.smallBoxPrice} = ${totalSmall.toLocaleString()} บาท`
+      `กล่องเล็ก: ${smallQty} × ${smallPrice} = ${totalSmall.toLocaleString()} บาท`
     );
 
-    leftY += 10;
+    leftLine("สรุปยอด", { bold: true, size: 16 });
 
-    leftLine("สรุปยอด", 16, true);
+    leftLine(`รวม: ${total.toLocaleString()} บาท`, { bold: true });
 
-    leftLine(`รวม: ${total.toLocaleString()} บาท`, 15, true);
+    leftLine(`สุทธิ: ${finalTotal.toLocaleString()} บาท`, {
+      bold: true,
+      size: 17,
+    });
 
-    leftLine(`สุทธิ: ${finalTotal.toLocaleString()} บาท`, 18, true);
-
-    // ===== RIGHT =====
+    // ===== RIGHT (ย้ายมาทั้งหมด) =====
     if (deductions.length > 0) {
-      rightLine("รายการหักเบิก", 15, true);
+      rightLine("รายการหักเบิก", { bold: true, size: 15 });
 
       deductions.forEach((d, i) => {
         rightLine(
-          `${i + 1}. ${d.label || "-"} ${Number(d.amount).toLocaleString()} บาท`
+          `${i + 1}. ${d.label || "-"} : ${Number(
+            d.amount
+          ).toLocaleString()} บาท`
         );
       });
 
-      rightY += 10;
-
-      // ✅ รวมหักเบิก (ย้ายมาขวา)
       rightLine(
         `รวมรายการหักเบิก: ${totalDeduction.toLocaleString()} บาท`,
-        15,
-        true
+        { bold: true, size: 15 }
       );
     }
 
     if (extraExpenses.length > 0) {
       rightY += 10;
 
-      rightLine("รายการจ่ายเพิ่ม", 15, true);
+      rightLine("รายการจ่ายเพิ่ม", { bold: true, size: 15 });
 
       extraExpenses.forEach((e, i) => {
         rightLine(
-          `${i + 1}. ${e.label || "-"} ${Number(e.amount).toLocaleString()} บาท`
+          `${i + 1}. ${e.label || "-"} : ${Number(
+            e.amount
+          ).toLocaleString()} บาท`
         );
       });
 
-      rightY += 10;
-
-      // ✅ รวมจ่ายเพิ่ม (ย้ายมาขวา)
       rightLine(
         `รวมจ่ายเพิ่มอื่นๆ: ${totalExtraExpense.toLocaleString()} บาท`,
-        15,
-        true
+        { bold: true, size: 15 }
       );
     }
 
-    // ===== เส้นกลาง =====
+    // ===== LINE =====
     doc
-      .moveTo(280, 100)
-      .lineTo(280, doc.page.height - 70)
+      .moveTo(285, 115)
+      .lineTo(285, doc.page.height - 70)
       .stroke();
 
-    // ===== SIGNATURE =====
+    // ===== SIGN =====
     const signY = doc.page.height - 60;
 
     doc.font("thai").fontSize(12).text(
@@ -279,7 +344,10 @@ router.post("/:id/pdf", async (req, res) => {
     doc.end();
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "error", details: err });
+    res.status(500).json({
+      error: "เกิดข้อผิดพลาดในการสร้าง PDF",
+      details: err,
+    });
   }
 });
 
