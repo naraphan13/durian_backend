@@ -37,7 +37,7 @@ router.post('/exportpdf', async (req, res) => {
     0, 50, { align: 'center' }
   );
 
-  doc.font('thai-bold').fontSize(20).text(`วันที่ / Date: ${data.date}`, 150, 150);
+  doc.font('thai-bold').fontSize(23).text(`วันที่ / Date: ${data.date}`, 150, 150);
   doc.text(`ปลายทาง / Destination: ${data.city}`);
   doc.text(`ตู้ / Container: ${data.containerInfo}`);
   doc.text(`รหัสตู้ / Container Code: ${data.containerCode}`);
