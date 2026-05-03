@@ -20,6 +20,7 @@ const calculateRoute = require('./routes/calculate-router');
 const seasonRoute = require('./routes/season-router');
 const dailyFinanceRoute = require('./routes/daily-finance-routes');
 const invoicesRouter = require("./routes/invoicepdf");
+const lungsangInvoicesRouter = require("./routes/lungsanginvoicepdf");
 const app = express();
 
 app.use(cors({
@@ -43,6 +44,7 @@ app.use("/v1/calculate", calculateRoute);
 app.use("/v1/seasons", seasonRoute);
 app.use('/v1/dailyfinance', dailyFinanceRoute);
 app.use("/v1/invoices", invoicesRouter);
+app.use("/v1/lungsang-invoices", lungsangInvoicesRouter);
 
 
 

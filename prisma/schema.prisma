@@ -364,3 +364,64 @@ model InvoiceExpense {
 
   @@index([invoiceId])
 }
+
+
+
+model LungSangInvoice {
+  id               Int      @id @default(autoincrement())
+  date             DateTime @default(now())
+  shipDate         DateTime?
+
+  invoiceNo        Int      @default(1)
+  docType          String   @default("INVOICE")
+
+  companyName      String?
+  companyAddress   String?
+  companyTaxId     String?
+  companyPhone     String?
+  companyLogoKey   String?
+
+  billToName       String?
+  billToAddress    String?
+  billToTaxId      String?
+
+  containerCode    String?
+  brandRemark      String?
+  temperature      String?
+  transport        String?
+  note             String?  @db.Text
+
+  totalBoxes       Float    @default(0)
+  totalWeightKg    Float    @default(0)
+  subtotalAmount   Float    @default(0)
+  expenseAmount    Float    @default(0)
+  grandTotalAmount Float    @default(0)
+  amountText       String?
+
+  items            LungSangInvoiceItem[]
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model LungSangInvoiceItem {
+  id            Int      @id @default(autoincrement())
+  invoiceId     Int
+
+  purchaseDate  DateTime?
+  brand         String?
+  variety       String?
+  grade         String?
+  boxSize       String?
+
+  boxes         Float?
+  weightPerBox  Float?
+  weightTotalKg Float    @default(0)
+  unitPrice     Float    @default(0)
+  amount        Float    @default(0)
+
+  invoice       LungSangInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
