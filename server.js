@@ -51,5 +51,5 @@ app.use("/v1/lungsang-invoices", lungsangInvoicesRouter);
 app.use(notFound);
 app.use(errorMiddleware);
 
-const port = process.env.PORT || 9988;
+const port = process.env.PORT || 9989;
 app.listen(port, () => console.log(`✅ Server running on port ${port}`));
