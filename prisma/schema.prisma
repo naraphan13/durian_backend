@@ -32,14 +32,30 @@ model Bill {
   season   Season?  @relation(fields: [seasonId], references: [id]) // ✅ เพิ่ม
 }
 
+model Branch {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique // จันทบุรี, ชุมพร
+  seasons   Season[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 model Season {
   id              Int               @id @default(autoincrement())
-  name            String            @unique // เช่น "2025-chanthaburi"
+  name            String
   startDate       DateTime
-  endDate         DateTime? // ✅ ยังไม่รู้วันปิดก็ใส่ null ได้
-  bills           Bill[] // ✅ Relation กลับไปยัง Bill
+  endDate         DateTime?
+
+  branchId        Int?
+  branch          Branch?           @relation(fields: [branchId], references: [id])
+
+  bills           Bill[]
   ExportContainer ExportContainer[]
   invoices        Invoice[]
+
+  @@unique([branchId, name])
+  @@index([branchId])
 }
 
 model Item {
